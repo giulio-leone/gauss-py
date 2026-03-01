@@ -35,6 +35,17 @@ from gauss.memory import Memory
 from gauss.middleware import MiddlewareChain
 from gauss.network import Network
 from gauss.plugin import PluginRegistry
+from gauss.pipeline import (
+    compose,
+    compose_async,
+    filter_async,
+    filter_sync,
+    map_async,
+    map_sync,
+    pipe,
+    reduce_async,
+    reduce_sync,
+)
 from gauss.resilience import (
     create_circuit_breaker,
     create_fallback_provider,
@@ -129,4 +140,14 @@ __all__ = [
     "code_review",
     "classify",
     "extract",
+    # Pipeline & Async Helpers
+    "pipe",
+    "map_async",
+    "map_sync",
+    "filter_async",
+    "filter_sync",
+    "reduce_async",
+    "reduce_sync",
+    "compose",
+    "compose_async",
 ]

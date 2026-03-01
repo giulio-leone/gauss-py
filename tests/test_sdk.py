@@ -931,3 +931,98 @@ class TestTemplate:
         from gauss import PromptTemplate, template
         assert callable(template)
         assert PromptTemplate is not None
+
+
+class TestPipeline:
+    @pytest.mark.asyncio
+    async def test_pipe_no_steps(self) -> None:
+        from gauss.pipeline import pipe
+        assert await pipe("hello") == "hello"
+
+    @pytest.mark.asyncio
+    async def test_pipe_sync_steps(self) -> None:
+        from gauss.pipeline import pipe
+        result = await pipe(5, lambda n: n * 2, lambda n: n + 1)
+        assert result == 11
+
+    @pytest.mark.asyncio
+    async def test_pipe_async_steps(self) -> None:
+        import asyncio
+        from gauss.pipeline import pipe
+        async def double(n: int) -> int:
+            return n * 2
+        async def add_one(n: int) -> int:
+            return n + 1
+        result = await pipe(5, double, add_one)
+        assert result == 11
+
+    def test_map_sync(self) -> None:
+        from gauss.pipeline import map_sync
+        results = map_sync([1, 2, 3], lambda x: x * 2)
+        assert results == [2, 4, 6]
+
+    def test_map_sync_with_concurrency(self) -> None:
+        from gauss.pipeline import map_sync
+        results = map_sync([1, 2, 3], lambda x: x * 2, concurrency=2)
+        assert results == [2, 4, 6]
+
+    @pytest.mark.asyncio
+    async def test_map_async(self) -> None:
+        from gauss.pipeline import map_async
+        async def double(x: int) -> int:
+            return x * 2
+        results = await map_async([1, 2, 3], double)
+        assert results == [2, 4, 6]
+
+    @pytest.mark.asyncio
+    async def test_map_async_concurrency(self) -> None:
+        from gauss.pipeline import map_async
+        async def double(x: int) -> int:
+            return x * 2
+        results = await map_async([1, 2, 3], double, concurrency=2)
+        assert results == [2, 4, 6]
+
+    @pytest.mark.asyncio
+    async def test_filter_async(self) -> None:
+        from gauss.pipeline import filter_async
+        async def is_even(x: int) -> bool:
+            return x % 2 == 0
+        results = await filter_async([1, 2, 3, 4, 5], is_even)
+        assert results == [2, 4]
+
+    def test_filter_sync(self) -> None:
+        from gauss.pipeline import filter_sync
+        results = filter_sync([1, 2, 3, 4, 5], lambda x: x % 2 == 0)
+        assert results == [2, 4]
+
+    @pytest.mark.asyncio
+    async def test_reduce_async(self) -> None:
+        from gauss.pipeline import reduce_async
+        async def add(acc: int, x: int) -> int:
+            return acc + x
+        result = await reduce_async([1, 2, 3], add, 0)
+        assert result == 6
+
+    def test_reduce_sync(self) -> None:
+        from gauss.pipeline import reduce_sync
+        result = reduce_sync([1, 2, 3], lambda acc, x: acc + x, 0)
+        assert result == 6
+
+    def test_compose(self) -> None:
+        from gauss.pipeline import compose
+        fn = compose(lambda s: s.upper(), lambda s: f"[{s}]")
+        assert fn("hello") == "[HELLO]"
+
+    def test_exports(self) -> None:
+        from gauss import (
+            compose, compose_async, filter_async, filter_sync,
+            map_async, map_sync, pipe, reduce_async, reduce_sync,
+        )
+        assert callable(pipe)
+        assert callable(map_async)
+        assert callable(map_sync)
+        assert callable(filter_async)
+        assert callable(filter_sync)
+        assert callable(reduce_async)
+        assert callable(reduce_sync)
+        assert callable(compose)
