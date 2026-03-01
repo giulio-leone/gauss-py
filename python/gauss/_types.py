@@ -120,6 +120,7 @@ class AgentConfig:
     tools: list[ToolDef] = field(default_factory=list)
     stop_condition: str | None = None
     thinking_budget: int | None = None
+    cache_control: bool = False
 
     def resolve(self) -> tuple[ProviderType, str, str]:
         """Resolve provider, model, and API key from config or env."""
