@@ -109,6 +109,18 @@ _mock_native.tool_validator_validate.return_value = json.dumps({"valid": True})
 _mock_native.destroy_tool_validator.return_value = None
 _mock_native.py_parse_partial_json.return_value = json.dumps({"partial": True})
 
+# stream_generate returns a JSON array of JSON strings (each is a serialized event)
+import asyncio
+
+async def _mock_stream_generate(provider_handle, messages_json, temperature=None, max_tokens=None):
+    return json.dumps([
+        '{"type":"text_delta","text":"Hello"}',
+        '{"type":"text_delta","text":" World"}',
+        '{"type":"done"}',
+    ])
+
+_mock_native.stream_generate = _mock_stream_generate
+
 
 @pytest.fixture(autouse=True)
 def _mock_gauss_native(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -630,3 +642,292 @@ class TestBatch:
         from gauss import BatchItem, batch
         assert callable(batch)
         assert BatchItem is not None
+
+
+class TestAgentStream:
+    @pytest.mark.asyncio
+    async def test_stream_iter_yields_events(self) -> None:
+        from gauss import Agent
+        agent = Agent()
+        stream = agent.stream_iter("Hello")
+        events = []
+        async for event in stream:
+            events.append(event)
+        assert len(events) == 3
+        assert events[0].type == "text_delta"
+        assert events[0].text == "Hello"
+        assert events[1].type == "text_delta"
+        assert events[1].text == " World"
+        assert events[2].type == "done"
+        assert stream.text == "Hello World"
+        agent.destroy()
+
+    @pytest.mark.asyncio
+    async def test_stream_events_property(self) -> None:
+        from gauss import Agent
+        agent = Agent()
+        stream = agent.stream_iter("Hello")
+        async for _ in stream:
+            pass
+        assert len(stream.events) == 3
+        agent.destroy()
+
+    def test_stream_event_from_json_invalid(self) -> None:
+        from gauss.agent import StreamEvent
+        event = StreamEvent.from_json("not json{{{")
+        assert event.type == "raw"
+        assert event.text == "not json{{{"
+
+    def test_stream_event_from_json_valid(self) -> None:
+        from gauss.agent import StreamEvent
+        event = StreamEvent.from_json('{"type":"text_delta","text":"hi","extra":1}')
+        assert event.type == "text_delta"
+        assert event.text == "hi"
+        assert event.raw == {"extra": 1}
+
+    def test_stream_exports(self) -> None:
+        from gauss import AgentStream, StreamEvent
+        assert AgentStream is not None
+        assert StreamEvent is not None
+
+    @pytest.mark.asyncio
+    async def test_stream_raises_after_destroy(self) -> None:
+        from gauss import Agent
+        agent = Agent()
+        agent.destroy()
+        with pytest.raises(RuntimeError, match="destroyed"):
+            agent.stream_iter("Hello")
+
+
+class TestRetry:
+    def test_succeeds_first_try(self) -> None:
+        from gauss.retry import with_retry
+        calls = 0
+        def fn():
+            nonlocal calls
+            calls += 1
+            return "ok"
+        assert with_retry(fn) == "ok"
+        assert calls == 1
+
+    def test_retries_on_failure(self) -> None:
+        from gauss.retry import with_retry, RetryConfig
+        calls = 0
+        def fn():
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                raise RuntimeError("fail")
+            return "ok"
+        result = with_retry(fn, RetryConfig(max_retries=3, base_delay_s=0.001))
+        assert result == "ok"
+        assert calls == 3
+
+    def test_throws_after_max_retries(self) -> None:
+        from gauss.retry import with_retry, RetryConfig
+        def fn():
+            raise RuntimeError("always fail")
+        with pytest.raises(RuntimeError, match="always fail"):
+            with_retry(fn, RetryConfig(max_retries=2, base_delay_s=0.001))
+
+    def test_retry_if_predicate(self) -> None:
+        from gauss.retry import with_retry, RetryConfig
+        calls = 0
+        def fn():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise ValueError("retryable")
+            raise TypeError("not retryable")
+        with pytest.raises(TypeError, match="not retryable"):
+            with_retry(fn, RetryConfig(
+                max_retries=5,
+                base_delay_s=0.001,
+                retry_if=lambda e, _: isinstance(e, ValueError),
+            ))
+        assert calls == 2
+
+    def test_on_retry_callback(self) -> None:
+        from gauss.retry import with_retry, RetryConfig
+        retries = []
+        def fn():
+            if len(retries) < 1:
+                raise RuntimeError("fail")
+            return "ok"
+        with_retry(fn, RetryConfig(
+            max_retries=2,
+            base_delay_s=0.001,
+            on_retry=lambda e, a, d: retries.append((a, d)),
+        ))
+        assert len(retries) == 1
+        assert retries[0][0] == 1
+
+    def test_retryable_wraps_agent(self) -> None:
+        from gauss import Agent
+        from gauss.retry import retryable, RetryConfig
+        agent = Agent()
+        run = retryable(agent, RetryConfig(max_retries=1, base_delay_s=0.001))
+        result = run("Hello")
+        assert result.text == "The answer is 42"
+        agent.destroy()
+
+    def test_exports(self) -> None:
+        from gauss import RetryConfig, retryable, with_retry
+        assert callable(with_retry)
+        assert callable(retryable)
+        assert RetryConfig is not None
+
+
+class TestStructured:
+    def test_extracts_json(self) -> None:
+        from gauss import Agent
+        from gauss.structured import structured
+        _mock_native.agent_run.return_value = json.dumps({
+            "text": '{"fruits":["apple","banana"]}',
+            "messages": [], "toolCalls": [], "usage": {},
+        })
+        agent = Agent()
+        result = structured(agent, "List fruits", schema={
+            "type": "object",
+            "properties": {"fruits": {"type": "array"}},
+        })
+        assert result.data == {"fruits": ["apple", "banana"]}
+        agent.destroy()
+
+    def test_handles_code_blocks(self) -> None:
+        from gauss import Agent
+        from gauss.structured import structured
+        _mock_native.agent_run.return_value = json.dumps({
+            "text": 'Here:\n```json\n{"name":"Alice"}\n```',
+            "messages": [], "toolCalls": [], "usage": {},
+        })
+        agent = Agent()
+        result = structured(agent, "Who?", schema={"type": "object"})
+        assert result.data == {"name": "Alice"}
+        agent.destroy()
+
+    def test_include_raw(self) -> None:
+        from gauss import Agent
+        from gauss.structured import structured
+        _mock_native.agent_run.return_value = json.dumps({
+            "text": '{"ok":true}',
+            "messages": [], "toolCalls": [], "usage": {},
+        })
+        agent = Agent()
+        result = structured(agent, "test", schema={"type": "object"}, include_raw=True)
+        assert result.raw is not None
+        agent.destroy()
+
+    def test_retries_on_parse_failure(self) -> None:
+        from gauss import Agent
+        from gauss.structured import structured
+        call_count = 0
+        orig_return = _mock_native.agent_run.return_value
+        def _side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return json.dumps({"text": "not json!!!", "messages": [], "toolCalls": [], "usage": {}})
+            return json.dumps({"text": '{"valid":true}', "messages": [], "toolCalls": [], "usage": {}})
+        _mock_native.agent_run.side_effect = _side_effect
+        agent = Agent()
+        result = structured(agent, "test", schema={"type": "object"})
+        assert result.data == {"valid": True}
+        agent.destroy()
+        _mock_native.agent_run.side_effect = None
+        _mock_native.agent_run.return_value = orig_return
+
+    def test_throws_after_max_retries(self) -> None:
+        from gauss import Agent
+        from gauss.structured import structured
+        _mock_native.agent_run.return_value = json.dumps({
+            "text": "never valid json!!!",
+            "messages": [], "toolCalls": [], "usage": {},
+        })
+        agent = Agent()
+        with pytest.raises(RuntimeError, match="Failed to extract"):
+            structured(agent, "test", schema={"type": "object"}, max_parse_retries=1)
+        agent.destroy()
+
+    def test_requires_schema_or_config(self) -> None:
+        from gauss import Agent
+        from gauss.structured import structured
+        agent = Agent()
+        with pytest.raises(ValueError, match="schema or config"):
+            structured(agent, "test")
+        agent.destroy()
+
+    def test_exports(self) -> None:
+        from gauss import StructuredConfig, StructuredResult, structured
+        assert callable(structured)
+        assert StructuredConfig is not None
+        assert StructuredResult is not None
+
+
+class TestTemplate:
+    def test_create_template(self) -> None:
+        from gauss.template import template
+        t = template("Hello {{name}}, age {{age}}")
+        assert t.variables == ["name", "age"]
+        assert t.raw == "Hello {{name}}, age {{age}}"
+
+    def test_render(self) -> None:
+        from gauss.template import template
+        t = template("Hello {{name}}!")
+        assert t(name="World") == "Hello World!"
+
+    def test_missing_variable(self) -> None:
+        from gauss.template import template
+        t = template("Hello {{name}}!")
+        with pytest.raises(KeyError, match="name"):
+            t()
+
+    def test_multiple_occurrences(self) -> None:
+        from gauss.template import template
+        t = template("{{x}} + {{x}} = 2*{{x}}")
+        assert t(x="5") == "5 + 5 = 2*5"
+        assert t.variables == ["x"]
+
+    def test_composition(self) -> None:
+        from gauss.template import template
+        inner = template("Hello {{name}}")
+        outer = template("{{greeting}}, welcome!")
+        result = outer(greeting=inner(name="Alice"))
+        assert result == "Hello Alice, welcome!"
+
+    def test_repr(self) -> None:
+        from gauss.template import template
+        t = template("{{a}} {{b}}")
+        assert "a" in repr(t)
+        assert "b" in repr(t)
+
+    def test_builtin_summarize(self) -> None:
+        from gauss import summarize
+        assert summarize.variables == ["format", "style", "text"]
+
+    def test_builtin_translate(self) -> None:
+        from gauss import translate
+        result = translate(language="French", text="Hello")
+        assert "French" in result
+        assert "Hello" in result
+
+    def test_builtin_code_review(self) -> None:
+        from gauss import code_review
+        result = code_review(language="python", code="x = 1")
+        assert "python" in result
+        assert "x = 1" in result
+
+    def test_builtin_classify(self) -> None:
+        from gauss import classify
+        result = classify(categories="spam, ham", text="Buy now!")
+        assert "spam" in result
+
+    def test_builtin_extract(self) -> None:
+        from gauss import extract
+        result = extract(fields="name, email", text="I'm John")
+        assert "name" in result
+
+    def test_exports(self) -> None:
+        from gauss import PromptTemplate, template
+        assert callable(template)
+        assert PromptTemplate is not None

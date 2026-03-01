@@ -23,7 +23,7 @@ from gauss._types import (
     SearchResult,
     ToolDef,
 )
-from gauss.agent import Agent, BatchItem, batch, gauss
+from gauss.agent import Agent, AgentStream, BatchItem, StreamEvent, batch, gauss
 from gauss.approval import ApprovalManager
 from gauss.checkpoint import CheckpointStore
 from gauss.config import parse_agent_config, resolve_env
@@ -40,8 +40,19 @@ from gauss.resilience import (
     create_fallback_provider,
     create_resilient_provider,
 )
+from gauss.retry import RetryConfig, retryable, with_retry
 from gauss.stream import parse_partial_json
+from gauss.structured import StructuredConfig, StructuredResult, structured
 from gauss.telemetry import Telemetry
+from gauss.template import (
+    PromptTemplate,
+    classify,
+    code_review,
+    extract,
+    summarize,
+    template,
+    translate,
+)
 from gauss.tokens import (
     count_message_tokens,
     count_tokens,
@@ -57,6 +68,9 @@ __all__ = [
     "gauss",
     "batch",
     "BatchItem",
+    # Streaming
+    "AgentStream",
+    "StreamEvent",
     # Core
     "Agent",
     "AgentConfig",
@@ -99,4 +113,20 @@ __all__ = [
     "parse_partial_json",
     "parse_agent_config",
     "resolve_env",
+    # Retry
+    "with_retry",
+    "retryable",
+    "RetryConfig",
+    # Structured Output
+    "structured",
+    "StructuredConfig",
+    "StructuredResult",
+    # Prompt Templates
+    "template",
+    "PromptTemplate",
+    "summarize",
+    "translate",
+    "code_review",
+    "classify",
+    "extract",
 ]

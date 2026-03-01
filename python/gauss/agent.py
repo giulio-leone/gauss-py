@@ -18,7 +18,8 @@ One-liner::
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from gauss._types import AgentConfig, AgentResult, Message, ToolDef
 
@@ -132,6 +133,32 @@ class Agent:
             self._config.max_tokens,
         )
 
+    def stream_iter(
+        self, prompt: str | Sequence[Message | dict[str, str]]
+    ) -> AgentStream:
+        """Return an async iterable stream of events.
+
+        Example::
+
+            async for event in agent.stream_iter("Tell me a story"):
+                if event.type == "text_delta":
+                    print(event.text, end="", flush=True)
+
+            # Access final aggregated text after iteration:
+            stream = agent.stream_iter("Tell me a story")
+            async for event in stream:
+                ...
+            print(stream.text)
+        """
+        self._check_alive()
+        messages = self._normalize_messages(prompt)
+        return AgentStream(
+            provider_handle=self._provider_handle,
+            messages=messages,
+            temperature=self._config.temperature,
+            max_tokens=self._config.max_tokens,
+        )
+
     # ── Tool Management ────────────────────────────────────────────────
 
     def add_tool(self, tool: ToolDef) -> Agent:
@@ -211,6 +238,105 @@ def gauss(prompt: str, **kwargs: Any) -> str:
     """
     with Agent(AgentConfig(**kwargs)) as agent:
         return agent.run(prompt).text
+
+
+# ── Stream events ────────────────────────────────────────────────────
+
+
+@dataclass
+class StreamEvent:
+    """A single event from a streaming response.
+
+    Attributes:
+        type: Event type (e.g., "text_delta", "tool_call", "raw").
+        text: Text content (for text_delta events).
+        tool_call: Tool call info dict (for tool_call events).
+        raw: Raw data dict for any extra fields.
+    """
+
+    type: str
+    text: str | None = None
+    tool_call: dict[str, str] | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> StreamEvent:
+        """Parse a JSON string into a StreamEvent."""
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            return cls(type="raw", text=json_str)
+        return cls(
+            type=data.get("type", "unknown"),
+            text=data.get("text"),
+            tool_call=data.get("toolCall"),
+            raw={k: v for k, v in data.items() if k not in ("type", "text", "toolCall")},
+        )
+
+
+class AgentStream:
+    """Async iterable wrapper over native streaming.
+
+    Yields :class:`StreamEvent` objects and provides the full aggregated
+    text after iteration via :attr:`text`.
+
+    Example::
+
+        stream = agent.stream_iter("Tell me a story")
+        async for event in stream:
+            if event.type == "text_delta":
+                print(event.text, end="", flush=True)
+        print()
+        print("Full text:", stream.text)
+    """
+
+    def __init__(
+        self,
+        *,
+        provider_handle: int,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> None:
+        self._provider_handle = provider_handle
+        self._messages = messages
+        self._temperature = temperature
+        self._max_tokens = max_tokens
+        self._events: list[StreamEvent] = []
+        self._text: str | None = None
+
+    @property
+    def text(self) -> str | None:
+        """Aggregated text from all text_delta events (available after iteration)."""
+        return self._text
+
+    @property
+    def events(self) -> list[StreamEvent]:
+        """All events yielded during iteration."""
+        return list(self._events)
+
+    async def __aiter__(self) -> AsyncIterator[StreamEvent]:
+        from gauss._native import stream_generate  # type: ignore[import-not-found]
+
+        messages_json = json.dumps(self._messages)
+        result_json: str = await stream_generate(
+            self._provider_handle,
+            messages_json,
+            self._temperature,
+            self._max_tokens,
+        )
+
+        raw_events: list[str] = json.loads(result_json)
+        parts: list[str] = []
+
+        for raw in raw_events:
+            event = StreamEvent.from_json(raw)
+            self._events.append(event)
+            if event.type == "text_delta" and event.text:
+                parts.append(event.text)
+            yield event
+
+        self._text = "".join(parts)
 
 
 # ── Batch execution ──────────────────────────────────────────────────
