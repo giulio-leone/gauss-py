@@ -110,6 +110,12 @@ from gauss.a2a import (
     TaskState,
     TaskStatus,
 )
+from gauss.tool_registry import (
+    ToolRegistry,
+    ToolRegistryEntry,
+    ToolExample as ToolRegistryExample,
+    ToolSearchResult,
+)
 
 __all__ = [
     # One-liner
@@ -227,4 +233,9 @@ __all__ = [
     "Task",
     "TaskState",
     "TaskStatus",
+    # Tool Registry
+    "ToolRegistry",
+    "ToolRegistryEntry",
+    "ToolRegistryExample",
+    "ToolSearchResult",
 ]
