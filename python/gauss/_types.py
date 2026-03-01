@@ -233,6 +233,8 @@ class AgentConfig:
     tools: list[ToolDef] = field(default_factory=list)
     stop_condition: str | None = None
     thinking_budget: int | None = None
+    reasoning_effort: str | None = None
+    """Reasoning effort for OpenAI o-series models: 'low', 'medium', or 'high'."""
     cache_control: bool = False
     code_execution: bool | CodeExecutionOptions | None = None
     grounding: bool = False

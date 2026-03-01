@@ -172,6 +172,8 @@ class Agent:
             options["stop_on_tool"] = self._config.stop_condition
         if self._config.thinking_budget is not None:
             options["thinking_budget"] = self._config.thinking_budget
+        if self._config.reasoning_effort is not None:
+            options["reasoning_effort"] = self._config.reasoning_effort
         if self._config.cache_control:
             options["cache_control"] = True
         if self._config.code_execution is not None:
