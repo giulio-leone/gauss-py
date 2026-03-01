@@ -139,10 +139,8 @@ def detect_provider() -> ProviderType:
             return provider
     if os.environ.get("OLLAMA_HOST"):
         return ProviderType.OLLAMA
-    raise EnvironmentError(
-        "No API key found. Set one of: "
-        + ", ".join(_ENV_MAP.values())
-        + " or OLLAMA_HOST"
+    raise OSError(
+        "No API key found. Set one of: " + ", ".join(_ENV_MAP.values()) + " or OLLAMA_HOST"
     )
 
 
@@ -155,7 +153,7 @@ def resolve_api_key(provider: ProviderType) -> str:
         raise ValueError(f"Unknown provider: {provider}")
     key = os.environ.get(env_var, "")
     if not key:
-        raise EnvironmentError(f"{env_var} not set")
+        raise OSError(f"{env_var} not set")
     return key
 
 

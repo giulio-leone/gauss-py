@@ -47,14 +47,16 @@ class VectorStore:
         items = []
         for chunk in chunks:
             if isinstance(chunk, Chunk):
-                items.append({
-                    "id": chunk.id,
-                    "document_id": chunk.document_id,
-                    "content": chunk.content,
-                    "index": chunk.index,
-                    "metadata": chunk.metadata or {},
-                    **({"embedding": chunk.embedding} if chunk.embedding else {}),
-                })
+                items.append(
+                    {
+                        "id": chunk.id,
+                        "document_id": chunk.document_id,
+                        "content": chunk.content,
+                        "index": chunk.index,
+                        "metadata": chunk.metadata or {},
+                        **({"embedding": chunk.embedding} if chunk.embedding else {}),
+                    }
+                )
             else:
                 items.append(chunk)
         vector_store_upsert(self._handle, json.dumps(items))
@@ -68,9 +70,7 @@ class VectorStore:
         from gauss._native import vector_store_search  # type: ignore[import-not-found]
 
         self._check_alive()
-        result_json: str = vector_store_search(
-            self._handle, json.dumps(embedding), top_k
-        )
+        result_json: str = vector_store_search(self._handle, json.dumps(embedding), top_k)
         data = json.loads(result_json)
         return [
             SearchResult(

@@ -34,7 +34,6 @@ from gauss.mcp import McpServer
 from gauss.memory import Memory
 from gauss.middleware import MiddlewareChain
 from gauss.network import Network
-from gauss.plugin import PluginRegistry
 from gauss.pipeline import (
     compose,
     compose_async,
@@ -46,6 +45,7 @@ from gauss.pipeline import (
     reduce_async,
     reduce_sync,
 )
+from gauss.plugin import PluginRegistry
 from gauss.resilience import (
     create_circuit_breaker,
     create_fallback_provider,

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -161,8 +161,7 @@ def structured(
         structured_prompt = _build_structured_prompt(prompt, cfg.schema)
         if attempt > 0 and last_error:
             structured_prompt += (
-                f"\n\nPrevious attempt failed: {last_error}. "
-                f"Please output ONLY valid JSON."
+                f"\n\nPrevious attempt failed: {last_error}. Please output ONLY valid JSON."
             )
 
         result = agent.run(structured_prompt)

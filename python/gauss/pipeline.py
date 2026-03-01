@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-from typing import Any, Awaitable, Callable, Sequence, TypeVar
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -176,11 +177,13 @@ def compose(*fns: Callable[[T], T]) -> Callable[[T], T]:
         )
         result = enhance("  hello  ")  # "[System]   hello  ".strip() is wrong
     """
+
     def _composed(input: T) -> T:
         result = input
         for fn in fns:
             result = fn(result)
         return result
+
     return _composed
 
 
@@ -194,9 +197,11 @@ async def compose_async(*fns: Callable[[T], Awaitable[T]]) -> Callable[[T], Awai
             lambda text: agent.arun(f"Summarize: {text}"),
         )
     """
+
     async def _composed(input: T) -> T:
         result = input
         for fn in fns:
             result = await fn(result)
         return result
+
     return _composed

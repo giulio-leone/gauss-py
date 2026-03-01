@@ -38,9 +38,7 @@ class ApprovalManager:
             self._handle, tool_name, json.dumps(args), session_id
         )
 
-    def approve(
-        self, request_id: str, modified_args: dict[str, Any] | None = None
-    ) -> None:
+    def approve(self, request_id: str, modified_args: dict[str, Any] | None = None) -> None:
         """Approve a pending request, optionally with modified arguments."""
         from gauss._native import approval_approve  # type: ignore[import-not-found]
 

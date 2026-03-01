@@ -16,8 +16,6 @@ Example::
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Any
 
 _VAR_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 
@@ -82,13 +80,9 @@ def template(template_str: str) -> PromptTemplate:
 
 # ─── Built-in templates ────────────────────────────────────────────
 
-summarize = template(
-    "Summarize the following {{format}} in {{style}}:\n\n{{text}}"
-)
+summarize = template("Summarize the following {{format}} in {{style}}:\n\n{{text}}")
 
-translate = template(
-    "Translate the following text to {{language}}:\n\n{{text}}"
-)
+translate = template("Translate the following text to {{language}}:\n\n{{text}}")
 
 code_review = template(
     "Review this {{language}} code for bugs, security issues, and best practices:"

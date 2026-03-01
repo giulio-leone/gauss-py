@@ -14,7 +14,9 @@ def create_fallback_provider(provider_handles: list[int]) -> int:
         backup = Agent(provider=ProviderType.ANTHROPIC).handle
         fallback = create_fallback_provider([primary, backup])
     """
-    from gauss._native import create_fallback_provider as _native_create  # type: ignore[import-not-found]
+    from gauss._native import (
+        create_fallback_provider as _native_create,  # type: ignore[import-not-found]
+    )
 
     return _native_create(json.dumps(provider_handles))  # type: ignore[no-any-return]
 
@@ -30,7 +32,9 @@ def create_circuit_breaker(
 
         breaker = create_circuit_breaker(agent.handle, failure_threshold=3)
     """
-    from gauss._native import create_circuit_breaker as _native_create  # type: ignore[import-not-found]
+    from gauss._native import (
+        create_circuit_breaker as _native_create,  # type: ignore[import-not-found]
+    )
 
     return _native_create(provider_handle, failure_threshold, recovery_timeout_ms)  # type: ignore[no-any-return]
 
@@ -50,7 +54,9 @@ def create_resilient_provider(
             circuit_breaker=True,
         )
     """
-    from gauss._native import create_resilient_provider as _native_create  # type: ignore[import-not-found]
+    from gauss._native import (
+        create_resilient_provider as _native_create,  # type: ignore[import-not-found]
+    )
 
     return _native_create(  # type: ignore[no-any-return]
         primary_handle,

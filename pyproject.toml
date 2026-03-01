@@ -54,5 +54,5 @@ target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP", "ANN", "S", "B", "SIM", "TCH"]
-ignore = ["ANN101", "ANN102", "S101"]
+select = ["E", "F", "I", "N", "W", "UP", "ANN", "S", "B", "SIM"]
+ignore = ["S101", "ANN401", "S311", "B905"]

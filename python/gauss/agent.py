@@ -18,8 +18,9 @@ One-liner::
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 from gauss._types import AgentConfig, AgentResult, Message, ToolDef
 
@@ -50,7 +51,10 @@ class Agent:
     """
 
     def __init__(self, config: AgentConfig | None = None, **kwargs: Any) -> None:
-        from gauss._native import create_provider, destroy_provider  # type: ignore[import-not-found]
+        from gauss._native import (  # type: ignore[import-not-found]
+            create_provider,
+            destroy_provider,
+        )
 
         self._config = config or AgentConfig(**kwargs)
         self._tools: list[ToolDef] = list(self._config.tools)
@@ -133,9 +137,7 @@ class Agent:
             self._config.max_tokens,
         )
 
-    def stream_iter(
-        self, prompt: str | Sequence[Message | dict[str, str]]
-    ) -> AgentStream:
+    def stream_iter(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentStream:
         """Return an async iterable stream of events.
 
         Example::

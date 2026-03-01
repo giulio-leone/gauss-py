@@ -34,7 +34,9 @@ class GuardrailChain:
         warned_categories: list[str] | None = None,
     ) -> GuardrailChain:
         """Add content moderation guardrail. Returns self."""
-        from gauss._native import guardrail_chain_add_content_moderation  # type: ignore[import-not-found]
+        from gauss._native import (
+            guardrail_chain_add_content_moderation,  # type: ignore[import-not-found]
+        )
 
         self._check_alive()
         guardrail_chain_add_content_moderation(
@@ -46,15 +48,15 @@ class GuardrailChain:
 
     def add_pii_detection(self, action: str = "redact") -> GuardrailChain:
         """Add PII detection guardrail. Returns self."""
-        from gauss._native import guardrail_chain_add_pii_detection  # type: ignore[import-not-found]
+        from gauss._native import (
+            guardrail_chain_add_pii_detection,  # type: ignore[import-not-found]
+        )
 
         self._check_alive()
         guardrail_chain_add_pii_detection(self._handle, action)
         return self
 
-    def add_token_limit(
-        self, max_input: int = 4000, max_output: int = 2000
-    ) -> GuardrailChain:
+    def add_token_limit(self, max_input: int = 4000, max_output: int = 2000) -> GuardrailChain:
         """Add token limit guardrail. Returns self."""
         from gauss._native import guardrail_chain_add_token_limit  # type: ignore[import-not-found]
 
