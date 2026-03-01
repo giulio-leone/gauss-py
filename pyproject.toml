@@ -3,8 +3,8 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "gauss-ai"
-version = "0.2.0"
+name = "gauss-py"
+version = "1.0.0"
 description = "Gauss AI — Production-grade AI agents powered by Rust"
 readme = "README.md"
 license = "MIT"

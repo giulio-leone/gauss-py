@@ -1,6 +1,6 @@
 # 🧠 Gauss AI
 
-[![PyPI version](https://img.shields.io/pypi/v/gauss-ai)](https://pypi.org/project/gauss-ai/)
+[![PyPI version](https://img.shields.io/pypi/v/gauss-py)](https://pypi.org/project/gauss-py/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > **Production-grade AI agents powered by Rust.**
@@ -11,7 +11,7 @@
 ## Install
 
 ```bash
-pip install gauss-ai
+pip install gauss-py
 ```
 
 ## Quick Start — One Line
@@ -365,7 +365,7 @@ Python SDK (24 modules)
 | Package | Language | Description |
 |---------|----------|-------------|
 | [`gauss-core`](https://github.com/giulio-leone/gauss-core) | Rust | Core engine — NAPI + PyO3 + WASM |
-| [`gauss-ai`](https://github.com/giulio-leone/gauss) | TypeScript | TypeScript SDK (NAPI bindings) |
+| [`gauss-py`](https://github.com/giulio-leone/gauss) | TypeScript | TypeScript SDK (NAPI bindings) |
 | [`gauss-py`](https://github.com/giulio-leone/gauss-py) | Python | This SDK (PyO3 bindings) |
 
 ## License
