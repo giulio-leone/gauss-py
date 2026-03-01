@@ -17,6 +17,7 @@ from gauss import (
     GuardrailChain,
     Memory,
     MiddlewareChain,
+    OPENAI_DEFAULT,
     ProviderType,
     Telemetry,
 )
@@ -56,7 +57,7 @@ def main() -> None:
     agent = Agent(
         name="production-agent",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=os.environ["OPENAI_API_KEY"],
         system_prompt="You are a helpful assistant. Be concise.",
         temperature=0.5,
@@ -88,7 +89,7 @@ def main() -> None:
         telemetry.record_span({
             "name": "agent.run",
             "duration_ms": round(elapsed_ms),
-            "model": "gpt-4o",
+            "model": OPENAI_DEFAULT,
             "tokens_in": result.usage.get("prompt_tokens", 0),
             "tokens_out": result.usage.get("completion_tokens", 0),
         })

@@ -262,13 +262,21 @@ _ENV_MAP: dict[ProviderType, str] = {
     ProviderType.DEEPSEEK: "DEEPSEEK_API_KEY",
 }
 
+from gauss.models import (
+    ANTHROPIC_DEFAULT,
+    DEEPSEEK_DEFAULT,
+    GOOGLE_DEFAULT,
+    OPENAI_DEFAULT,
+    PROVIDER_DEFAULTS,
+)
+
 _DEFAULT_MODELS: dict[ProviderType, str] = {
-    ProviderType.OPENAI: "gpt-4o",
-    ProviderType.ANTHROPIC: "claude-sonnet-4-20250514",
-    ProviderType.GOOGLE: "gemini-2.0-flash",
-    ProviderType.GROQ: "llama-3.3-70b-versatile",
-    ProviderType.OLLAMA: "llama3.2",
-    ProviderType.DEEPSEEK: "deepseek-chat",
+    ProviderType.OPENAI: OPENAI_DEFAULT,
+    ProviderType.ANTHROPIC: ANTHROPIC_DEFAULT,
+    ProviderType.GOOGLE: GOOGLE_DEFAULT,
+    ProviderType.GROQ: PROVIDER_DEFAULTS["groq"],
+    ProviderType.OLLAMA: PROVIDER_DEFAULTS["ollama"],
+    ProviderType.DEEPSEEK: DEEPSEEK_DEFAULT,
 }
 
 
@@ -298,4 +306,4 @@ def resolve_api_key(provider: ProviderType) -> str:
 
 
 def _default_model(provider: ProviderType) -> str:
-    return _DEFAULT_MODELS.get(provider, "gpt-4o")
+    return _DEFAULT_MODELS.get(provider, OPENAI_DEFAULT)

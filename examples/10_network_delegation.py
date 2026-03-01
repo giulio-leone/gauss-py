@@ -10,7 +10,7 @@ Demonstrates:
 
 import os
 
-from gauss import Agent, Network, ProviderType
+from gauss import Agent, Network, ProviderType, OPENAI_DEFAULT
 
 
 def main() -> None:
@@ -20,7 +20,7 @@ def main() -> None:
     supervisor = Agent(
         name="supervisor",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt=(
             "You are a team supervisor. Route tasks to the right specialist. "
@@ -31,7 +31,7 @@ def main() -> None:
     coder = Agent(
         name="coder",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are an expert programmer. Write clean, production-ready code.",
     )
@@ -39,7 +39,7 @@ def main() -> None:
     analyst = Agent(
         name="analyst",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a data analyst. Provide data-driven insights.",
     )
@@ -47,7 +47,7 @@ def main() -> None:
     writer = Agent(
         name="writer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a technical writer. Write clear documentation.",
     )

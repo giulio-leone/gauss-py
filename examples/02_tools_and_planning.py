@@ -11,7 +11,7 @@ Demonstrates:
 import json
 import os
 
-from gauss import Agent, ProviderType, ToolDef
+from gauss import Agent, ProviderType, ToolDef, OPENAI_DEFAULT
 
 
 def main() -> None:
@@ -52,7 +52,7 @@ def main() -> None:
     with Agent(
         name="tool-agent",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=os.environ["OPENAI_API_KEY"],
         system_prompt="Use the available tools to answer questions.",
         tools=[calculator],

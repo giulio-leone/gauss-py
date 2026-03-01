@@ -9,7 +9,7 @@ Demonstrates:
 
 import os
 
-from gauss import Agent, Graph, ProviderType
+from gauss import Agent, Graph, ProviderType, OPENAI_DEFAULT
 
 
 def main() -> None:
@@ -19,7 +19,7 @@ def main() -> None:
     researcher = Agent(
         name="researcher",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Research the topic thoroughly. Provide key facts and data.",
     )
@@ -27,7 +27,7 @@ def main() -> None:
     writer = Agent(
         name="writer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Write clear, engaging content based on the research provided.",
     )
@@ -35,7 +35,7 @@ def main() -> None:
     reviewer = Agent(
         name="reviewer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Review the content for accuracy and clarity. Suggest improvements.",
     )
@@ -63,7 +63,7 @@ def main() -> None:
     analyst_tech = Agent(
         name="analyst-tech",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Analyze from a technical perspective.",
     )
@@ -71,7 +71,7 @@ def main() -> None:
     analyst_biz = Agent(
         name="analyst-biz",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Analyze from a business perspective.",
     )
@@ -79,7 +79,7 @@ def main() -> None:
     synthesizer = Agent(
         name="synthesizer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Combine analyses into a coherent summary.",
     )

@@ -15,6 +15,7 @@ import os
 
 from gauss import (
     Agent,
+    OPENAI_DEFAULT,
     ProviderType,
     RetryConfig,
     compose,
@@ -118,7 +119,7 @@ async def main() -> None:
     agent = Agent(
         name="retry-demo",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=os.environ["OPENAI_API_KEY"],
     )
 

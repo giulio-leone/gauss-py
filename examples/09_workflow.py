@@ -9,7 +9,7 @@ Demonstrates:
 
 import os
 
-from gauss import Agent, ProviderType, ToolDef, Workflow
+from gauss import Agent, ProviderType, ToolDef, Workflow, OPENAI_DEFAULT
 
 
 def main() -> None:
@@ -19,7 +19,7 @@ def main() -> None:
     planner = Agent(
         name="planner",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a project planner. Break tasks into actionable steps.",
     )
@@ -27,7 +27,7 @@ def main() -> None:
     designer = Agent(
         name="designer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a system designer. Create technical designs from plans.",
     )
@@ -35,7 +35,7 @@ def main() -> None:
     implementer = Agent(
         name="implementer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a developer. Write implementation details from designs.",
     )
@@ -43,7 +43,7 @@ def main() -> None:
     tester = Agent(
         name="tester",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a QA engineer. Create test plans for implementations.",
     )

@@ -9,14 +9,14 @@ Demonstrates:
 
 import os
 
-from gauss import Agent, ProviderType, StructuredConfig, structured
+from gauss import Agent, ProviderType, StructuredConfig, structured, OPENAI_DEFAULT
 
 
 def main() -> None:
     agent = Agent(
         name="structured-agent",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=os.environ["OPENAI_API_KEY"],
     )
 

@@ -12,7 +12,17 @@ Set the appropriate API key env vars before running:
 
 import os
 
-from gauss import Agent, AgentConfig, ProviderType
+from gauss import (
+    Agent,
+    AgentConfig,
+    ANTHROPIC_DEFAULT,
+    DEEPSEEK_DEFAULT,
+    GOOGLE_IMAGE,
+    OPENAI_DEFAULT,
+    OPENAI_FAST,
+    PROVIDER_DEFAULTS,
+    ProviderType,
+)
 
 
 def run_agent(label: str, **kwargs) -> None:
@@ -32,14 +42,14 @@ def main() -> None:
         run_agent(
             "GPT-4o",
             provider=ProviderType.OPENAI,
-            model="gpt-4o",
+            model=OPENAI_DEFAULT,
             api_key=os.environ["OPENAI_API_KEY"],
             temperature=0.5,
         )
         run_agent(
             "GPT-4o-mini",
             provider=ProviderType.OPENAI,
-            model="gpt-4o-mini",
+            model=OPENAI_FAST,
             api_key=os.environ["OPENAI_API_KEY"],
         )
     else:
@@ -51,14 +61,14 @@ def main() -> None:
         run_agent(
             "Claude Sonnet",
             provider=ProviderType.ANTHROPIC,
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_DEFAULT,
             api_key=os.environ["ANTHROPIC_API_KEY"],
         )
         # Extended thinking
         run_agent(
             "Claude (thinking)",
             provider=ProviderType.ANTHROPIC,
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_DEFAULT,
             api_key=os.environ["ANTHROPIC_API_KEY"],
             thinking_budget=2048,
         )
@@ -71,14 +81,14 @@ def main() -> None:
         run_agent(
             "Gemini 2.0 Flash",
             provider=ProviderType.GOOGLE,
-            model="gemini-2.0-flash",
+            model=GOOGLE_IMAGE,
             api_key=os.environ["GOOGLE_API_KEY"],
         )
         # With grounding (Google Search)
         run_agent(
             "Gemini (grounded)",
             provider=ProviderType.GOOGLE,
-            model="gemini-2.0-flash",
+            model=GOOGLE_IMAGE,
             api_key=os.environ["GOOGLE_API_KEY"],
             grounding=True,
         )
@@ -91,7 +101,7 @@ def main() -> None:
         run_agent(
             "Llama 3 (Groq)",
             provider=ProviderType.GROQ,
-            model="llama-3.3-70b-versatile",
+            model=PROVIDER_DEFAULTS["groq"],
             api_key=os.environ["GROQ_API_KEY"],
         )
     else:
@@ -103,7 +113,7 @@ def main() -> None:
         run_agent(
             "DeepSeek Chat",
             provider=ProviderType.DEEPSEEK,
-            model="deepseek-chat",
+            model=DEEPSEEK_DEFAULT,
             api_key=os.environ["DEEPSEEK_API_KEY"],
         )
     else:
@@ -114,7 +124,7 @@ def main() -> None:
     run_agent(
         "Ollama",
         provider=ProviderType.OLLAMA,
-        model="llama3.2",
+        model=PROVIDER_DEFAULTS["ollama"],
         base_url="http://localhost:11434",
     )
 
@@ -124,7 +134,7 @@ def main() -> None:
         run_agent(
             "OpenRouter",
             provider=ProviderType.OPENAI,  # OpenRouter is OpenAI-compatible
-            model="anthropic/claude-sonnet-4-20250514",
+            model=f"anthropic/{ANTHROPIC_DEFAULT}",
             api_key=os.environ["OPENROUTER_API_KEY"],
             base_url="https://openrouter.ai/api/v1",
         )

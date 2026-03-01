@@ -10,7 +10,7 @@ Demonstrates:
 
 import os
 
-from gauss import Agent, ProviderType, Team
+from gauss import Agent, ProviderType, Team, OPENAI_DEFAULT
 
 
 def main() -> None:
@@ -20,7 +20,7 @@ def main() -> None:
     researcher = Agent(
         name="researcher",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a research analyst. Provide factual, detailed research.",
     )
@@ -28,7 +28,7 @@ def main() -> None:
     writer = Agent(
         name="writer",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are a professional writer. Transform research into engaging prose.",
     )
@@ -36,7 +36,7 @@ def main() -> None:
     editor = Agent(
         name="editor",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="You are an editor. Polish text for clarity and conciseness.",
     )
@@ -53,7 +53,7 @@ def main() -> None:
     analyst_a = Agent(
         name="analyst-a",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Analyze from a technical perspective.",
     )
@@ -61,7 +61,7 @@ def main() -> None:
     analyst_b = Agent(
         name="analyst-b",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=api_key,
         system_prompt="Analyze from a business perspective.",
     )

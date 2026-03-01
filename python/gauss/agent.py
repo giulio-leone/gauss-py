@@ -41,6 +41,7 @@ from gauss._types import (
     resolve_api_key,
     _default_model,
 )
+from gauss.models import OPENAI_DEFAULT
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -507,7 +508,7 @@ def gauss(prompt: str, **kwargs: Any) -> str:
         print(answer)
 
         # With options
-        answer = gauss("Write a poem", temperature=0.9, model="gpt-4o")
+        answer = gauss("Write a poem", temperature=0.9, model=OPENAI_DEFAULT)
     """
     with Agent(AgentConfig(**kwargs)) as agent:
         return agent.run(prompt).text

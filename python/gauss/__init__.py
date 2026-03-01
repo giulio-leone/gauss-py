@@ -33,6 +33,23 @@ from gauss._types import (
     ToolDef,
 )
 from gauss.agent import Agent, AgentStream, BatchItem, StreamEvent, batch, gauss
+from gauss.models import (
+    ANTHROPIC_DEFAULT,
+    ANTHROPIC_FAST,
+    ANTHROPIC_PREMIUM,
+    DEEPSEEK_DEFAULT,
+    DEEPSEEK_REASONING,
+    GOOGLE_DEFAULT,
+    GOOGLE_IMAGE,
+    GOOGLE_PREMIUM,
+    OPENAI_DEFAULT,
+    OPENAI_FAST,
+    OPENAI_IMAGE,
+    OPENAI_REASONING,
+    OPENROUTER_DEFAULT,
+    PROVIDER_DEFAULTS,
+    default_model,
+)
 from gauss.approval import ApprovalManager
 from gauss.checkpoint import CheckpointStore
 from gauss.config import parse_agent_config, resolve_env
@@ -125,6 +142,22 @@ __all__ = [
     # Streaming
     "AgentStream",
     "StreamEvent",
+    # Model Constants
+    "OPENAI_DEFAULT",
+    "OPENAI_FAST",
+    "OPENAI_REASONING",
+    "OPENAI_IMAGE",
+    "ANTHROPIC_DEFAULT",
+    "ANTHROPIC_FAST",
+    "ANTHROPIC_PREMIUM",
+    "GOOGLE_DEFAULT",
+    "GOOGLE_PREMIUM",
+    "GOOGLE_IMAGE",
+    "OPENROUTER_DEFAULT",
+    "DEEPSEEK_DEFAULT",
+    "DEEPSEEK_REASONING",
+    "PROVIDER_DEFAULTS",
+    "default_model",
     # Core
     "Agent",
     "AgentConfig",

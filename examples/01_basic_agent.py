@@ -12,7 +12,7 @@ Demonstrates:
 import asyncio
 import os
 
-from gauss import Agent, AgentConfig, Message, ProviderType, batch, gauss
+from gauss import Agent, AgentConfig, Message, ProviderType, batch, gauss, OPENAI_DEFAULT
 
 
 async def main() -> None:
@@ -24,7 +24,7 @@ async def main() -> None:
     agent = Agent(
         name="basic-agent",
         provider=ProviderType.OPENAI,
-        model="gpt-4o",
+        model=OPENAI_DEFAULT,
         api_key=os.environ["OPENAI_API_KEY"],
         system_prompt="You are a concise assistant. Answer in one sentence.",
         temperature=0.3,
