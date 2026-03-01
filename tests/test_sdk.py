@@ -631,20 +631,20 @@ class TestTypes:
 
 class TestBatch:
     def test_batch_item_repr(self) -> None:
-        from gauss.agent import BatchItem
+        from gauss.batch import BatchItem
         item = BatchItem("hello")
         assert "hello" in repr(item)
         assert "error" in repr(item)
 
     def test_batch_item_ok(self) -> None:
         from gauss._types import AgentResult
-        from gauss.agent import BatchItem
+        from gauss.batch import BatchItem
         item = BatchItem("hello")
         item.result = AgentResult(text="world", messages=[], tool_calls=[], usage={})
         assert "ok" in repr(item)
 
     def test_batch_item_error(self) -> None:
-        from gauss.agent import BatchItem
+        from gauss.batch import BatchItem
         item = BatchItem("hello")
         item.error = RuntimeError("boom")
         assert "error" in repr(item)
@@ -685,13 +685,13 @@ class TestAgentStream:
         agent.destroy()
 
     def test_stream_event_from_json_invalid(self) -> None:
-        from gauss.agent import StreamEvent
+        from gauss.stream import StreamEvent
         event = StreamEvent.from_json("not json{{{")
         assert event.type == "raw"
         assert event.text == "not json{{{"
 
     def test_stream_event_from_json_valid(self) -> None:
-        from gauss.agent import StreamEvent
+        from gauss.stream import StreamEvent
         event = StreamEvent.from_json('{"type":"text_delta","data":"hi"}')
         assert event.type == "text_delta"
         assert event.text == "hi"

@@ -32,7 +32,10 @@ from gauss._types import (
     SearchResult,
     ToolDef,
 )
-from gauss.agent import Agent, AgentStream, BatchItem, StreamEvent, batch, gauss
+from gauss.agent import Agent, gauss
+from gauss.batch import BatchItem, batch
+from gauss.stream import AgentStream, StreamEvent, parse_partial_json
+from gauss.code_execution import available_runtimes, execute_code, generate_image
 from gauss.models import (
     ANTHROPIC_DEFAULT,
     ANTHROPIC_FAST,
@@ -93,7 +96,6 @@ from gauss.resilience import (
     create_resilient_provider,
 )
 from gauss.retry import RetryConfig, retryable, with_retry
-from gauss.stream import parse_partial_json
 from gauss.structured import StructuredConfig, StructuredResult, structured
 from gauss.telemetry import Telemetry
 from gauss.template import (
@@ -158,6 +160,10 @@ __all__ = [
     "DEEPSEEK_REASONING",
     "PROVIDER_DEFAULTS",
     "default_model",
+    # Code Execution & Image Generation
+    "execute_code",
+    "available_runtimes",
+    "generate_image",
     # Core
     "Agent",
     "AgentConfig",
