@@ -84,6 +84,43 @@ class Graph:
         graph_add_edge(self._handle, from_node, to_node)
         return self
 
+    def add_fork(
+        self,
+        node_id: str,
+        agents: list[Any],
+        *,
+        consensus: str = "concat",
+    ) -> Graph:
+        """Add a fork node — runs agents in parallel, merging via consensus.
+
+        Args:
+            node_id: Unique identifier for this fork node.
+            agents: List of Agent instances or dicts with 'agent' and optional 'instructions'.
+            consensus: Merge strategy — 'first' or 'concat' (default: 'concat').
+
+        Example::
+
+            graph.add_fork("parallel", [agent_a, agent_b], consensus="first")
+        """
+        from gauss._native import graph_add_fork_node  # type: ignore[import-not-found]
+
+        self._check_alive()
+        agent_defs = []
+        for a in agents:
+            if isinstance(a, dict):
+                agent_defs.append({
+                    "agent_name": a["agent"]._config.name,
+                    "provider_handle": a["agent"].handle,
+                    "instructions": a.get("instructions"),
+                })
+            else:
+                agent_defs.append({
+                    "agent_name": a._config.name,
+                    "provider_handle": a.handle,
+                })
+        graph_add_fork_node(self._handle, node_id, json.dumps(agent_defs), consensus)
+        return self
+
     def run(self, prompt: str) -> dict[str, Any]:
         """Execute the graph pipeline.
 
