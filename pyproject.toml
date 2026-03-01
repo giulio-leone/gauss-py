@@ -1,0 +1,53 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "gauss-ai"
+version = "0.1.0"
+description = "Gauss AI — Production-grade AI agents powered by Rust"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+keywords = ["ai", "agents", "llm", "rust", "openai", "anthropic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/giulio-leone/gauss"
+Repository = "https://github.com/giulio-leone/gauss"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+manifest-path = "../gauss-core/crates/gauss-python/Cargo.toml"
+python-source = "python"
+module-name = "gauss._native"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "ANN", "S", "B", "SIM", "TCH"]
+ignore = ["ANN101", "ANN102", "S101"]
