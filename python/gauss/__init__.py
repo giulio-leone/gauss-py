@@ -84,6 +84,18 @@ from gauss.tool_validator import ToolValidator
 from gauss.vector_store import VectorStore
 from gauss.workflow import Workflow
 from gauss.spec import AgentSpec, AgentToolSpec, SkillSpec, SkillStep, SkillParam, discover_agents
+from gauss.a2a import (
+    A2aClient,
+    A2aMessage,
+    AgentCard,
+    AgentCapabilities,
+    AgentSkill,
+    Artifact,
+    Part,
+    Task,
+    TaskState,
+    TaskStatus,
+)
 
 __all__ = [
     # One-liner
@@ -178,4 +190,15 @@ __all__ = [
     "SkillStep",
     "SkillParam",
     "discover_agents",
+    # A2A Protocol
+    "A2aClient",
+    "A2aMessage",
+    "AgentCard",
+    "AgentCapabilities",
+    "AgentSkill",
+    "Artifact",
+    "Part",
+    "Task",
+    "TaskState",
+    "TaskStatus",
 ]
