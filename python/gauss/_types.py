@@ -88,6 +88,25 @@ class SearchResult:
 
 
 @dataclass
+class ProviderCapabilities:
+    """Feature capabilities of a provider/model combination."""
+
+    streaming: bool = False
+    tool_use: bool = False
+    vision: bool = False
+    audio: bool = False
+    extended_thinking: bool = False
+    citations: bool = False
+    cache_control: bool = False
+    structured_output: bool = False
+    reasoning_effort: bool = False
+    image_generation: bool = False
+    grounding: bool = False
+    code_execution: bool = False
+    web_search: bool = False
+
+
+@dataclass
 class AgentConfig:
     """Agent configuration with sensible defaults.
 

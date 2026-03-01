@@ -20,6 +20,7 @@ from gauss._types import (
     AgentResult,
     Citation,
     Message,
+    ProviderCapabilities,
     ProviderType,
     SearchResult,
     ToolDef,
@@ -90,6 +91,7 @@ __all__ = [
     "AgentResult",
     "Citation",
     "Message",
+    "ProviderCapabilities",
     "ProviderType",
     "ToolDef",
     # Memory & RAG

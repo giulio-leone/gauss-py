@@ -22,7 +22,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from gauss._types import AgentConfig, AgentResult, Citation, Message, ToolDef
+from gauss._types import AgentConfig, AgentResult, Citation, Message, ProviderCapabilities, ToolDef
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -207,6 +207,30 @@ class Agent:
 
         data = json.loads(result_json)
         return data.get("text", "")
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """Query what features this provider/model supports."""
+        from gauss._native import get_provider_capabilities  # type: ignore[import-not-found]
+
+        self._check_alive()
+        caps_json = get_provider_capabilities(self._provider_handle)
+        data = json.loads(caps_json)
+        return ProviderCapabilities(
+            streaming=data.get("streaming", False),
+            tool_use=data.get("tool_use", False),
+            vision=data.get("vision", False),
+            audio=data.get("audio", False),
+            extended_thinking=data.get("extended_thinking", False),
+            citations=data.get("citations", False),
+            cache_control=data.get("cache_control", False),
+            structured_output=data.get("structured_output", False),
+            reasoning_effort=data.get("reasoning_effort", False),
+            image_generation=data.get("image_generation", False),
+            grounding=data.get("grounding", False),
+            code_execution=data.get("code_execution", False),
+            web_search=data.get("web_search", False),
+        )
 
     def stream_iter(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentStream:
         """Return an async iterable stream of events.
