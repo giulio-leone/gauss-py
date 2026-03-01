@@ -4,60 +4,30 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: read
-
 jobs:
   publish:
+    name: Build & Publish
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [x86_64, aarch64]
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install maturin
-        run: pip install maturin[patchelf]
-
-      - name: Build wheel
-        run: maturin build --release --strip -o dist
-        working-directory: .
-
-      - name: Publish to PyPI
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: maturin publish --skip-existing
-        working-directory: .
-
-  publish-sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install maturin
         run: pip install maturin
 
-      - name: Build sdist
-        run: maturin sdist -o dist
+      - name: Build wheels
+        run: maturin build --release
 
-      - name: Publish sdist to PyPI
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          pip install twine
-          twine upload --skip-existing dist/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: target/wheels/
