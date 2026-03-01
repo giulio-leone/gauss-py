@@ -23,7 +23,7 @@ from gauss._types import (
     SearchResult,
     ToolDef,
 )
-from gauss.agent import Agent, gauss
+from gauss.agent import Agent, BatchItem, batch, gauss
 from gauss.approval import ApprovalManager
 from gauss.checkpoint import CheckpointStore
 from gauss.config import parse_agent_config, resolve_env
@@ -55,6 +55,8 @@ from gauss.workflow import Workflow
 __all__ = [
     # One-liner
     "gauss",
+    "batch",
+    "BatchItem",
     # Core
     "Agent",
     "AgentConfig",

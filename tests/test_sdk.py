@@ -603,3 +603,30 @@ class TestTypes:
         from gauss._types import AgentResult
         result = AgentResult(text="Hello", messages=[], tool_calls=[], usage={})
         assert str(result) == "Hello"
+
+
+class TestBatch:
+    def test_batch_item_repr(self) -> None:
+        from gauss.agent import BatchItem
+        item = BatchItem("hello")
+        assert "hello" in repr(item)
+        assert "error" in repr(item)
+
+    def test_batch_item_ok(self) -> None:
+        from gauss._types import AgentResult
+        from gauss.agent import BatchItem
+        item = BatchItem("hello")
+        item.result = AgentResult(text="world", messages=[], tool_calls=[], usage={})
+        assert "ok" in repr(item)
+
+    def test_batch_item_error(self) -> None:
+        from gauss.agent import BatchItem
+        item = BatchItem("hello")
+        item.error = RuntimeError("boom")
+        assert "error" in repr(item)
+        assert item.result is None
+
+    def test_batch_exports(self) -> None:
+        from gauss import BatchItem, batch
+        assert callable(batch)
+        assert BatchItem is not None
