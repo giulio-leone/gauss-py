@@ -39,7 +39,21 @@ from gauss.config import parse_agent_config, resolve_env
 from gauss.eval import EvalRunner
 from gauss.graph import Graph
 from gauss.guardrail import GuardrailChain
-from gauss.mcp import McpServer
+from gauss.mcp import (
+    McpServer,
+    McpResource,
+    McpPrompt,
+    McpPromptArgument,
+    McpContent,
+    McpResourceContent,
+    McpPromptMessage,
+    McpPromptResult,
+    McpModelHint,
+    McpModelPreferences,
+    McpSamplingMessage,
+    McpSamplingRequest,
+    McpSamplingResponse,
+)
 from gauss.memory import Memory
 from gauss.middleware import MiddlewareChain
 from gauss.network import Network
@@ -145,6 +159,18 @@ __all__ = [
     "CheckpointStore",
     # MCP
     "McpServer",
+    "McpResource",
+    "McpPrompt",
+    "McpPromptArgument",
+    "McpContent",
+    "McpResourceContent",
+    "McpPromptMessage",
+    "McpPromptResult",
+    "McpModelHint",
+    "McpModelPreferences",
+    "McpSamplingMessage",
+    "McpSamplingRequest",
+    "McpSamplingResponse",
     # Resilience
     "create_fallback_provider",
     "create_circuit_breaker",
