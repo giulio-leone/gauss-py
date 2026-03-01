@@ -27,5 +27,11 @@ target/
 # Pytest
 .pytest_cache/
 
+# Generated docs
+docs/api/
+
+# Hypothesis
+.hypothesis/
+
 # Type checking
 .mypy_cache/

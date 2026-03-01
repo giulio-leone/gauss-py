@@ -27,6 +27,11 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/giulio-leone/gauss"
 Repository = "https://github.com/giulio-leone/gauss"
+Documentation = "https://github.com/giulio-leone/gauss-py#readme"
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "hypothesis"]
+docs = ["pdoc"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
