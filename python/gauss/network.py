@@ -81,13 +81,14 @@ class Network:
             The delegation result as a dict.
         """
         from gauss._native import network_delegate  # type: ignore[import-not-found]
+        from gauss.agent import _run_native
 
         self._check_alive()
         if isinstance(prompt, str):
             messages = [{"role": "user", "content": prompt}]
         else:
             messages = [m.to_dict() if isinstance(m, Message) else m for m in prompt]
-        result_json: str = network_delegate(self._handle, agent_name, json.dumps(messages))
+        result_json = _run_native(network_delegate, self._handle, agent_name, json.dumps(messages))
         return json.loads(result_json)  # type: ignore[no-any-return]
 
     def destroy(self) -> None:

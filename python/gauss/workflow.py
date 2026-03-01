@@ -84,7 +84,7 @@ class Workflow:
         workflow_add_dependency(self._handle, step_id, depends_on)
         return self
 
-    async def run(self, prompt: str) -> dict[str, Any]:
+    def run(self, prompt: str) -> dict[str, Any]:
         """Execute the workflow.
 
         Args:
@@ -94,9 +94,10 @@ class Workflow:
             A dict with ``steps`` containing per-step results.
         """
         from gauss._native import workflow_run  # type: ignore[import-not-found]
+        from gauss.agent import _run_native
 
         self._check_alive()
-        result_json: str = await workflow_run(self._handle, prompt)
+        result_json = _run_native(workflow_run, self._handle, prompt)
         return json.loads(result_json)  # type: ignore[no-any-return]
 
     def destroy(self) -> None:
