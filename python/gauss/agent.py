@@ -28,9 +28,18 @@ from gauss._types import (
     Citation,
     CodeExecutionOptions,
     CodeExecutionResult,
+    GeneratedImageData,
+    GroundingChunk,
+    GroundingMetadata,
+    ImageGenerationConfig,
+    ImageGenerationResult,
     Message,
     ProviderCapabilities,
+    ProviderType,
     ToolDef,
+    detect_provider,
+    resolve_api_key,
+    _default_model,
 )
 
 if TYPE_CHECKING:
@@ -178,6 +187,13 @@ class Agent:
                     "sandbox": ce.sandbox,
                 }
 
+        if self._config.grounding:
+            options["grounding"] = True
+        if self._config.native_code_execution:
+            options["native_code_execution"] = True
+        if self._config.response_modalities is not None:
+            options["response_modalities"] = self._config.response_modalities
+
         result_json = _run_native(
             agent_run,
             self._config.name,
@@ -198,6 +214,18 @@ class Agent:
             )
             for c in raw_citations
         ]
+        raw_grounding = data.get("grounding_metadata", [])
+        grounding_metadata = [
+            GroundingMetadata(
+                search_queries=gm.get("search_queries", []),
+                grounding_chunks=[
+                    GroundingChunk(url=gc.get("url"), title=gc.get("title"))
+                    for gc in gm.get("grounding_chunks", [])
+                ],
+                search_entry_point=gm.get("search_entry_point"),
+            )
+            for gm in (raw_grounding or [])
+        ]
         return AgentResult(
             text=data.get("text", ""),
             messages=data.get("messages", []),
@@ -205,6 +233,7 @@ class Agent:
             usage=data.get("usage", {}),
             thinking=data.get("thinking"),
             citations=citations,
+            grounding_metadata=grounding_metadata,
         )
 
     def generate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:
@@ -334,6 +363,74 @@ class Agent:
 
         result_json = _run_native(_runtimes)
         return json.loads(result_json)
+
+    @staticmethod
+    def generate_image(
+        prompt: str,
+        *,
+        provider: ProviderType | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        size: str | None = None,
+        quality: str | None = None,
+        style: str | None = None,
+        aspect_ratio: str | None = None,
+        n: int | None = None,
+        response_format: str | None = None,
+    ) -> ImageGenerationResult:
+        """Generate images using a provider's image generation API.
+
+        Example::
+
+            # OpenAI DALL-E
+            result = Agent.generate_image("A sunset over mountains", model="dall-e-3")
+            print(result.images[0].url)
+
+            # Gemini
+            result = Agent.generate_image("A cat", provider="google", aspect_ratio="16:9")
+        """
+        from gauss._native import (  # type: ignore[import-not-found]
+            create_provider,
+            destroy_provider,
+            generate_image as _gen_image,
+        )
+
+        resolved_provider = provider or detect_provider()
+        resolved_model = model or _default_model(resolved_provider)
+        resolved_key = api_key or resolve_api_key(resolved_provider)
+        prov_opts: dict[str, Any] = {"api_key": resolved_key}
+        if base_url:
+            prov_opts["base_url"] = base_url
+        handle = _run_native(create_provider, resolved_provider.value, resolved_model, json.dumps(prov_opts))
+        try:
+            result_json = _run_native(
+                _gen_image,
+                handle,
+                prompt,
+                model,
+                size,
+                quality,
+                style,
+                aspect_ratio,
+                n,
+                response_format,
+            )
+            data = json.loads(result_json)
+            images = [
+                GeneratedImageData(
+                    url=img.get("url"),
+                    base64=img.get("base64"),
+                    mime_type=img.get("mime_type") or img.get("mimeType"),
+                )
+                for img in data.get("images", [])
+            ]
+            return ImageGenerationResult(
+                images=images,
+                revised_prompt=data.get("revised_prompt") or data.get("revisedPrompt"),
+            )
+        finally:
+            _run_native(destroy_provider, handle)
 
     # ── Tool Management ────────────────────────────────────────────────
 

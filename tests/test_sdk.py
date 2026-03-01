@@ -1106,3 +1106,152 @@ class TestTeam:
         t.destroy()
         with pytest.raises(RuntimeError, match="destroyed"):
             t.add(MagicMock())
+
+
+# ─── Grounding & Image Generation Types ──────────────────────────────
+
+class TestGroundingTypes:
+    """Tests for grounding metadata types."""
+
+    def test_grounding_chunk_defaults(self) -> None:
+        from gauss._types import GroundingChunk
+        gc = GroundingChunk()
+        assert gc.url is None
+        assert gc.title is None
+
+    def test_grounding_chunk_with_values(self) -> None:
+        from gauss._types import GroundingChunk
+        gc = GroundingChunk(url="https://example.com", title="Example")
+        assert gc.url == "https://example.com"
+        assert gc.title == "Example"
+
+    def test_grounding_metadata_defaults(self) -> None:
+        from gauss._types import GroundingMetadata
+        gm = GroundingMetadata()
+        assert gm.search_queries == []
+        assert gm.grounding_chunks == []
+        assert gm.search_entry_point is None
+
+    def test_grounding_metadata_with_values(self) -> None:
+        from gauss._types import GroundingChunk, GroundingMetadata
+        gm = GroundingMetadata(
+            search_queries=["test query"],
+            grounding_chunks=[GroundingChunk(url="https://example.com", title="Example")],
+            search_entry_point="<div>rendered</div>",
+        )
+        assert len(gm.search_queries) == 1
+        assert gm.search_queries[0] == "test query"
+        assert len(gm.grounding_chunks) == 1
+        assert gm.grounding_chunks[0].url == "https://example.com"
+        assert gm.search_entry_point == "<div>rendered</div>"
+
+
+class TestImageGenerationTypes:
+    """Tests for image generation types."""
+
+    def test_image_generation_config_defaults(self) -> None:
+        from gauss._types import ImageGenerationConfig
+        cfg = ImageGenerationConfig()
+        assert cfg.model is None
+        assert cfg.size is None
+        assert cfg.quality is None
+        assert cfg.style is None
+        assert cfg.aspect_ratio is None
+        assert cfg.n is None
+        assert cfg.response_format is None
+
+    def test_image_generation_config_dalle(self) -> None:
+        from gauss._types import ImageGenerationConfig
+        cfg = ImageGenerationConfig(
+            model="dall-e-3", size="1024x1024", quality="hd", style="vivid", n=1,
+        )
+        assert cfg.model == "dall-e-3"
+        assert cfg.size == "1024x1024"
+        assert cfg.quality == "hd"
+        assert cfg.style == "vivid"
+        assert cfg.n == 1
+
+    def test_image_generation_config_gemini(self) -> None:
+        from gauss._types import ImageGenerationConfig
+        cfg = ImageGenerationConfig(aspect_ratio="16:9")
+        assert cfg.aspect_ratio == "16:9"
+
+    def test_generated_image_data_defaults(self) -> None:
+        from gauss._types import GeneratedImageData
+        img = GeneratedImageData()
+        assert img.url is None
+        assert img.base64 is None
+        assert img.mime_type is None
+
+    def test_generated_image_data_url(self) -> None:
+        from gauss._types import GeneratedImageData
+        img = GeneratedImageData(url="https://example.com/image.png", mime_type="image/png")
+        assert img.url == "https://example.com/image.png"
+        assert img.mime_type == "image/png"
+
+    def test_image_generation_result(self) -> None:
+        from gauss._types import GeneratedImageData, ImageGenerationResult
+        result = ImageGenerationResult(
+            images=[GeneratedImageData(url="https://example.com/img.png")],
+            revised_prompt="A beautiful sunset",
+        )
+        assert len(result.images) == 1
+        assert result.images[0].url == "https://example.com/img.png"
+        assert result.revised_prompt == "A beautiful sunset"
+
+    def test_image_generation_result_defaults(self) -> None:
+        from gauss._types import ImageGenerationResult
+        result = ImageGenerationResult()
+        assert result.images == []
+        assert result.revised_prompt is None
+
+
+class TestAgentConfigNewFields:
+    """Tests for new AgentConfig fields (grounding, native_code_execution, response_modalities)."""
+
+    def test_default_grounding_false(self) -> None:
+        from gauss._types import AgentConfig
+        cfg = AgentConfig()
+        assert cfg.grounding is False
+
+    def test_grounding_enabled(self) -> None:
+        from gauss._types import AgentConfig
+        cfg = AgentConfig(grounding=True)
+        assert cfg.grounding is True
+
+    def test_native_code_execution_default(self) -> None:
+        from gauss._types import AgentConfig
+        cfg = AgentConfig()
+        assert cfg.native_code_execution is False
+
+    def test_native_code_execution_enabled(self) -> None:
+        from gauss._types import AgentConfig
+        cfg = AgentConfig(native_code_execution=True)
+        assert cfg.native_code_execution is True
+
+    def test_response_modalities_default(self) -> None:
+        from gauss._types import AgentConfig
+        cfg = AgentConfig()
+        assert cfg.response_modalities is None
+
+    def test_response_modalities_set(self) -> None:
+        from gauss._types import AgentConfig
+        cfg = AgentConfig(response_modalities=["TEXT", "IMAGE"])
+        assert cfg.response_modalities == ["TEXT", "IMAGE"]
+
+    def test_agent_result_grounding_metadata(self) -> None:
+        from gauss._types import AgentResult, GroundingMetadata
+        result = AgentResult(
+            text="test",
+            messages=[],
+            tool_calls=[],
+            usage={},
+            grounding_metadata=[GroundingMetadata(search_queries=["q"])],
+        )
+        assert len(result.grounding_metadata) == 1
+        assert result.grounding_metadata[0].search_queries == ["q"]
+
+    def test_agent_result_grounding_default(self) -> None:
+        from gauss._types import AgentResult
+        result = AgentResult(text="test", messages=[], tool_calls=[], usage={})
+        assert result.grounding_metadata == []

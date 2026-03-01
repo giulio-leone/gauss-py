@@ -72,6 +72,7 @@ class AgentResult:
     usage: dict[str, Any]
     thinking: str | None = None
     citations: list[Citation] = field(default_factory=list)
+    grounding_metadata: list[GroundingMetadata] = field(default_factory=list)
 
     def __str__(self) -> str:
         return self.text
@@ -140,6 +141,62 @@ class CodeExecutionResult:
 
 
 @dataclass
+class GroundingChunk:
+    """A single grounding chunk (web search result)."""
+
+    url: str | None = None
+    title: str | None = None
+
+
+@dataclass
+class GroundingMetadata:
+    """Metadata from Google Search grounding."""
+
+    search_queries: list[str] = field(default_factory=list)
+    grounding_chunks: list[GroundingChunk] = field(default_factory=list)
+    search_entry_point: str | None = None
+
+
+@dataclass
+class ImageGenerationConfig:
+    """Configuration for image generation.
+
+    Example::
+
+        # OpenAI DALL-E
+        config = ImageGenerationConfig(model="dall-e-3", size="1024x1024")
+
+        # Gemini
+        config = ImageGenerationConfig(aspect_ratio="16:9")
+    """
+
+    model: str | None = None
+    size: str | None = None
+    quality: str | None = None
+    style: str | None = None
+    aspect_ratio: str | None = None
+    n: int | None = None
+    response_format: str | None = None
+
+
+@dataclass
+class GeneratedImageData:
+    """A single generated image."""
+
+    url: str | None = None
+    base64: str | None = None
+    mime_type: str | None = None
+
+
+@dataclass
+class ImageGenerationResult:
+    """Result of image generation."""
+
+    images: list[GeneratedImageData] = field(default_factory=list)
+    revised_prompt: str | None = None
+
+
+@dataclass
 class AgentConfig:
     """Agent configuration with sensible defaults.
 
@@ -178,6 +235,12 @@ class AgentConfig:
     thinking_budget: int | None = None
     cache_control: bool = False
     code_execution: bool | CodeExecutionOptions | None = None
+    grounding: bool = False
+    """Enable Google Search grounding (Gemini only)."""
+    native_code_execution: bool = False
+    """Enable native code execution / Gemini code interpreter."""
+    response_modalities: list[str] | None = None
+    """Response modalities (e.g. ["TEXT", "IMAGE"] for Gemini image generation)."""
 
     def resolve(self) -> tuple[ProviderType, str, str]:
         """Resolve provider, model, and API key from config or env."""
