@@ -44,32 +44,42 @@ with Agent() as agent:
 ## Multi-Agent Graph
 
 ```python
+import asyncio
 from gauss import Agent, Graph
 
 researcher = Agent(name="researcher", system_prompt="You research topics deeply")
 writer = Agent(name="writer", system_prompt="You write clear articles")
 
-result = (
-    Graph()
-    .add_node("research", researcher)
-    .add_node("write", writer)
-    .add_edge("research", "write")
-    .run("Write about AI safety")
-)
+async def main():
+    result = await (
+        Graph()
+        .add_node("research", researcher)
+        .add_node("write", writer)
+        .add_edge("research", "write")
+        .run("Write about AI safety")
+    )
+    print(result)
+
+asyncio.run(main())
 ```
 
 ## Workflow
 
 ```python
+import asyncio
 from gauss import Agent, Workflow
 
-result = (
-    Workflow()
-    .add_step("analyze", Agent(name="analyzer"), instructions="Analyze the data")
-    .add_step("report", Agent(name="reporter"))
-    .add_dependency("report", "analyze")
-    .run("Q3 sales data")
-)
+async def main():
+    result = await (
+        Workflow()
+        .add_step("analyze", Agent(name="analyzer"), instructions="Analyze the data")
+        .add_step("report", Agent(name="reporter"))
+        .add_dependency("report", "analyze")
+        .run("Q3 sales data")
+    )
+    print(result)
+
+asyncio.run(main())
 ```
 
 ## RAG (Vector Store)
@@ -105,6 +115,18 @@ server.add_tool(ToolDef(name="search", description="Web search"))
 response = server.handle_message({"jsonrpc": "2.0", "method": "tools/list"})
 ```
 
+## Middleware
+
+```python
+from gauss import MiddlewareChain
+
+chain = (
+    MiddlewareChain()
+    .use_logging()
+    .use_caching(ttl_ms=60_000)
+)
+```
+
 ## Features
 
 | Feature | Module |
@@ -115,11 +137,11 @@ response = server.handle_message({"jsonrpc": "2.0", "method": "tools/list"})
 | RAG | `VectorStore` |
 | MCP | `McpServer` |
 | Guardrails | `GuardrailChain` |
+| Middleware | `MiddlewareChain` |
 | Eval | `EvalRunner` |
 | Telemetry | `Telemetry` |
 | HITL | `ApprovalManager`, `CheckpointStore` |
 | Plugins | `PluginRegistry` |
-| Middleware | `MiddlewareChain` |
 | Resilience | `create_fallback_provider`, `create_circuit_breaker` |
 | Tokens | `count_tokens`, `get_context_window_size` |
 
@@ -131,6 +153,28 @@ response = server.handle_message({"jsonrpc": "2.0", "method": "tools/list"})
 - Groq (`GROQ_API_KEY`)
 - DeepSeek (`DEEPSEEK_API_KEY`)
 - Ollama (`OLLAMA_HOST`)
+
+## Architecture
+
+Gauss-py is a thin Python SDK wrapping **[gauss-core](https://github.com/giulio-leone/gauss-core)** (Rust) via PyO3 bindings. All heavy lifting runs at native Rust speed.
+
+```
+Python SDK (20 modules)
+       │
+       ▼
+  PyO3 Bindings (87+ functions)
+       │
+       ▼
+  gauss-core (Rust engine)
+```
+
+## Ecosystem
+
+| Package | Language | Description |
+|---------|----------|-------------|
+| [`gauss-core`](https://github.com/giulio-leone/gauss-core) | Rust | Core engine — NAPI + PyO3 + WASM |
+| [`gauss`](https://github.com/giulio-leone/gauss) | TypeScript | TypeScript SDK (NAPI bindings) |
+| [`gauss-py`](https://github.com/giulio-leone/gauss-py) | Python | This SDK (PyO3 bindings) |
 
 ## License
 
