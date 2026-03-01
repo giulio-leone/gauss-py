@@ -33,7 +33,8 @@ _mock_native.stream_generate = MagicMock(return_value="[]")
 if "gauss._native" not in sys.modules:
     sys.modules["gauss._native"] = _mock_native
 
-from gauss.agent import Agent, AgentConfig, batch
+from gauss.agent import Agent, AgentConfig
+from gauss.batch import batch
 from gauss.retry import with_retry, retryable, RetryConfig, _compute_delay
 from gauss.structured import structured, StructuredConfig, _extract_json
 from gauss.template import template, PromptTemplate
