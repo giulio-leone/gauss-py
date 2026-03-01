@@ -14,8 +14,10 @@ class Chunk:
     """A document chunk for vector upsert."""
 
     id: str
-    text: str
-    embedding: list[float]
+    document_id: str
+    content: str
+    index: int
+    embedding: list[float] | None = None
     metadata: dict[str, Any] | None = None
 
 
@@ -47,9 +49,11 @@ class VectorStore:
             if isinstance(chunk, Chunk):
                 items.append({
                     "id": chunk.id,
-                    "text": chunk.text,
-                    "embedding": chunk.embedding,
+                    "document_id": chunk.document_id,
+                    "content": chunk.content,
+                    "index": chunk.index,
                     "metadata": chunk.metadata or {},
+                    **({"embedding": chunk.embedding} if chunk.embedding else {}),
                 })
             else:
                 items.append(chunk)
@@ -71,7 +75,7 @@ class VectorStore:
         return [
             SearchResult(
                 id=r["id"],
-                text=r["text"],
+                text=r.get("content", r.get("text", "")),
                 score=r["score"],
                 metadata=r.get("metadata", {}),
             )

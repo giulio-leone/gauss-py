@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Literal
 
-from gauss._types import Message
+MemoryEntryType = Literal["conversation", "fact", "preference", "task", "summary"]
 
 
 class Memory:
@@ -14,12 +16,16 @@ class Memory:
     Example::
 
         mem = Memory()
-        mem.store("user", "Hello!")
+        mem.store("conversation", "Hello!")
         entries = mem.recall(session_id="default")
+
+        # Dict form
+        mem.store({"id": "m1", "content": "Hi", "entry_type": "conversation",
+                   "timestamp": "2024-01-01T00:00:00Z"})
 
         # Context manager
         with Memory() as mem:
-            mem.store(Message("user", "Hi"))
+            mem.store("conversation", "Hi")
     """
 
     def __init__(self) -> None:
@@ -30,30 +36,36 @@ class Memory:
 
     def store(
         self,
-        role_or_message: str | Message | dict[str, Any],
+        entry_type_or_dict: MemoryEntryType | dict[str, Any],
         content: str | None = None,
-        session_id: str = "default",
+        session_id: str | None = None,
     ) -> None:
         """Store a memory entry.
 
         Overloaded signatures::
 
-            mem.store("user", "Hello!", session_id="s1")
-            mem.store(Message("user", "Hello!"), session_id="s1")
-            mem.store({"role": "user", "content": "Hello!", "sessionId": "s1"})
+            mem.store("conversation", "Hello!", session_id="s1")
+            mem.store({"id": "m1", "content": "Hi", "entry_type": "conversation", ...})
         """
         from gauss._native import memory_store  # type: ignore[import-not-found]
 
         self._check_alive()
 
-        if isinstance(role_or_message, str) and content is not None:
-            entry = {"role": role_or_message, "content": content, "sessionId": session_id}
-        elif isinstance(role_or_message, Message):
-            entry = {**role_or_message.to_dict(), "sessionId": session_id}
-        elif isinstance(role_or_message, dict):
-            entry = role_or_message
+        if isinstance(entry_type_or_dict, dict):
+            entry = entry_type_or_dict
+        elif isinstance(entry_type_or_dict, str) and content is not None:
+            entry = {
+                "id": str(uuid.uuid4()),
+                "content": content,
+                "entry_type": entry_type_or_dict,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            if session_id:
+                entry["session_id"] = session_id
         else:
-            raise TypeError(f"Expected str, Message, or dict, got {type(role_or_message)}")
+            raise TypeError(
+                f"Expected (entry_type, content) or dict, got {type(entry_type_or_dict)}"
+            )
 
         memory_store(self._handle, json.dumps(entry))
 

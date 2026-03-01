@@ -198,7 +198,7 @@ class TestMemory:
     def test_store_and_recall(self) -> None:
         from gauss.memory import Memory
         mem = Memory()
-        mem.store("user", "Hello!", session_id="s1")
+        mem.store("conversation", "Hello!", session_id="s1")
         entries = mem.recall(session_id="s1")
         assert len(entries) == 1
         assert entries[0]["content"] == "Hi"
@@ -208,18 +208,17 @@ class TestMemory:
         )
         mem.destroy()
 
-    def test_store_message_object(self) -> None:
-        from gauss._types import Message
+    def test_store_dict(self) -> None:
         from gauss.memory import Memory
         mem = Memory()
-        mem.store(Message("assistant", "World"))
+        mem.store({"id": "m1", "content": "World", "entry_type": "conversation", "timestamp": "2024-01-01T00:00:00Z"})
         _mock_native.memory_store.assert_called_once()
         mem.destroy()
 
     def test_context_manager(self) -> None:
         from gauss.memory import Memory
         with Memory() as mem:
-            mem.store("user", "Test")
+            mem.store("conversation", "Test")
         _mock_native.destroy_memory.assert_called()
 
 
@@ -231,7 +230,7 @@ class TestVectorStore:
     def test_upsert_and_search(self) -> None:
         from gauss.vector_store import Chunk, VectorStore
         store = VectorStore()
-        store.upsert([Chunk(id="c1", text="hello", embedding=[0.1, 0.2])])
+        store.upsert([Chunk(id="c1", document_id="d1", content="hello", index=0, embedding=[0.1, 0.2])])
         results = store.search([0.1, 0.2], top_k=5)
         assert len(results) == 1
         assert results[0].score == 0.95
