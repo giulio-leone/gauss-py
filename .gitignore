@@ -35,3 +35,9 @@ docs/api/
 
 # Type checking
 .mypy_cache/
+
+# Build artifacts
+*.dSYM/
+.coverage
+*.so
+*.dylib
