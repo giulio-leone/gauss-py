@@ -18,6 +18,7 @@ One-liner::
 from gauss._types import (
     AgentConfig,
     AgentResult,
+    Citation,
     Message,
     ProviderType,
     SearchResult,
@@ -87,6 +88,7 @@ __all__ = [
     "Agent",
     "AgentConfig",
     "AgentResult",
+    "Citation",
     "Message",
     "ProviderType",
     "ToolDef",

@@ -22,7 +22,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from gauss._types import AgentConfig, AgentResult, Message, ToolDef
+from gauss._types import AgentConfig, AgentResult, Citation, Message, ToolDef
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -163,12 +163,24 @@ class Agent:
         )
 
         data = json.loads(result_json)
+        raw_citations = data.get("citations", [])
+        citations = [
+            Citation(
+                citation_type=c.get("type", ""),
+                cited_text=c.get("cited_text"),
+                document_title=c.get("document_title"),
+                start=c.get("start"),
+                end=c.get("end"),
+            )
+            for c in raw_citations
+        ]
         return AgentResult(
             text=data.get("text", ""),
             messages=data.get("messages", []),
             tool_calls=data.get("toolCalls", []),
             usage=data.get("usage", {}),
             thinking=data.get("thinking"),
+            citations=citations,
         )
 
     def generate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:

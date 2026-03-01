@@ -47,6 +47,22 @@ class ToolDef:
 
 
 @dataclass
+class Citation:
+    """A citation reference from document-aware responses."""
+
+    citation_type: str
+    """Citation type: char_location, page_location, content_block_location."""
+    cited_text: str | None = None
+    """The cited text from the document."""
+    document_title: str | None = None
+    """Title of the source document."""
+    start: int | None = None
+    """Start index (character, page, or block depending on type)."""
+    end: int | None = None
+    """End index (character, page, or block depending on type)."""
+
+
+@dataclass
 class AgentResult:
     """Result from an agent run."""
 
@@ -55,6 +71,7 @@ class AgentResult:
     tool_calls: list[dict[str, Any]]
     usage: dict[str, Any]
     thinking: str | None = None
+    citations: list[Citation] = field(default_factory=list)
 
     def __str__(self) -> str:
         return self.text
