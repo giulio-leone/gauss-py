@@ -1,0 +1,117 @@
+"""Team — multi-agent coordination backed by Rust core.
+
+Example::
+
+    from gauss import Agent, Team
+
+    researcher = Agent(name="researcher", instructions="Research topics")
+    writer = Agent(name="writer", instructions="Write summaries")
+
+    team = Team("content-team")
+    team.add(researcher)
+    team.add(writer)
+    team.strategy("sequential")
+
+    result = team.run("Explain quantum computing")
+    print(result["finalText"])
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Literal
+
+
+TeamStrategy = Literal["sequential", "parallel"]
+
+
+class Team:
+    """Multi-agent team with sequential or parallel coordination.
+
+    Args:
+        name: Team name.
+
+    Example::
+
+        team = (
+            Team("my-team")
+            .add(agent_a)
+            .add(agent_b)
+            .strategy("parallel")
+        )
+        result = team.run("Do the thing")
+    """
+
+    def __init__(self, name: str) -> None:
+        from gauss._native import create_team  # type: ignore[import-not-found]
+
+        self._handle: int = create_team(name)
+        self._destroyed = False
+
+    @property
+    def handle(self) -> int:
+        return self._handle
+
+    def add(self, agent: Any, *, instructions: str | None = None) -> Team:
+        """Add an agent to the team. Returns self for chaining.
+
+        Args:
+            agent: An Agent instance.
+            instructions: Optional override instructions for this agent in the team.
+        """
+        from gauss._native import team_add_agent  # type: ignore[import-not-found]
+
+        self._check_alive()
+        team_add_agent(self._handle, agent._config.name, agent.handle, instructions)
+        return self
+
+    def strategy(self, s: TeamStrategy) -> Team:
+        """Set coordination strategy. Returns self for chaining.
+
+        Args:
+            s: Either ``"sequential"`` (agents run in order, each sees previous output)
+               or ``"parallel"`` (agents run concurrently, results merged).
+        """
+        from gauss._native import team_set_strategy  # type: ignore[import-not-found]
+
+        self._check_alive()
+        team_set_strategy(self._handle, s)
+        return self
+
+    def run(self, prompt: str) -> dict[str, Any]:
+        """Run the team with an initial prompt.
+
+        Args:
+            prompt: The user prompt to process.
+
+        Returns:
+            A dict with ``finalText`` and ``results`` (per-agent outputs).
+        """
+        from gauss._native import team_run  # type: ignore[import-not-found]
+        from gauss.agent import _run_native
+
+        self._check_alive()
+        messages = json.dumps([{"role": "user", "content": prompt}])
+        result_json = _run_native(team_run, self._handle, messages)
+        return json.loads(result_json)  # type: ignore[no-any-return]
+
+    def destroy(self) -> None:
+        """Release native resources."""
+        if not self._destroyed:
+            from gauss._native import destroy_team  # type: ignore[import-not-found]
+
+            destroy_team(self._handle)
+            self._destroyed = True
+
+    def __enter__(self) -> Team:
+        return self
+
+    def __exit__(self, *_: Any) -> None:
+        self.destroy()
+
+    def __del__(self) -> None:
+        self.destroy()
+
+    def _check_alive(self) -> None:
+        if self._destroyed:
+            raise RuntimeError("Team has been destroyed")

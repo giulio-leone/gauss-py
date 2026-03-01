@@ -109,6 +109,16 @@ _mock_native.tool_validator_validate.return_value = json.dumps({"valid": True})
 _mock_native.destroy_tool_validator.return_value = None
 _mock_native.py_parse_partial_json.return_value = json.dumps({"partial": True})
 
+# Team
+_mock_native.create_team.return_value = 200
+_mock_native.team_add_agent.return_value = None
+_mock_native.team_set_strategy.return_value = None
+_mock_native.team_run.return_value = json.dumps({
+    "finalText": "team output",
+    "results": [{"text": "agent1 result", "steps": 1, "inputTokens": 10, "outputTokens": 20}],
+})
+_mock_native.destroy_team.return_value = None
+
 # stream_generate returns a JSON array of event objects (adjacently tagged)
 import asyncio
 
@@ -1024,3 +1034,75 @@ class TestPipeline:
         assert callable(reduce_async)
         assert callable(reduce_sync)
         assert callable(compose)
+
+
+# ===========================================================================
+# Team Tests
+# ===========================================================================
+
+class TestTeam:
+    def test_create_team(self) -> None:
+        from gauss.team import Team
+        t = Team("my-team")
+        _mock_native.create_team.assert_called_once_with("my-team")
+        assert t.handle == 200
+        t.destroy()
+
+    def test_add_agent(self) -> None:
+        from gauss.agent import Agent
+        from gauss.team import Team
+        a = Agent(name="helper")
+        t = Team("t")
+        t.add(a)
+        _mock_native.team_add_agent.assert_called_once_with(200, "helper", 1, None)
+        a.destroy()
+        t.destroy()
+
+    def test_add_agent_with_instructions(self) -> None:
+        from gauss.agent import Agent
+        from gauss.team import Team
+        a = Agent(name="helper")
+        t = Team("t")
+        t.add(a, instructions="custom instructions")
+        _mock_native.team_add_agent.assert_called_once_with(200, "helper", 1, "custom instructions")
+        a.destroy()
+        t.destroy()
+
+    def test_set_strategy(self) -> None:
+        from gauss.team import Team
+        t = Team("t").strategy("parallel")
+        _mock_native.team_set_strategy.assert_called_once_with(200, "parallel")
+        t.destroy()
+
+    def test_chaining(self) -> None:
+        from gauss.agent import Agent
+        from gauss.team import Team
+        a = Agent(name="r")
+        b = Agent(name="w")
+        t = Team("t").add(a).add(b).strategy("sequential")
+        assert isinstance(t, Team)
+        a.destroy()
+        b.destroy()
+        t.destroy()
+
+    def test_run(self) -> None:
+        from gauss.team import Team
+        t = Team("t")
+        result = t.run("Do the thing")
+        assert result["finalText"] == "team output"
+        assert len(result["results"]) == 1
+        assert result["results"][0]["text"] == "agent1 result"
+        t.destroy()
+
+    def test_context_manager(self) -> None:
+        from gauss.team import Team
+        with Team("t") as t:
+            pass
+        _mock_native.destroy_team.assert_called_once()
+
+    def test_throws_after_destroy(self) -> None:
+        from gauss.team import Team
+        t = Team("t")
+        t.destroy()
+        with pytest.raises(RuntimeError, match="destroyed"):
+            t.add(MagicMock())

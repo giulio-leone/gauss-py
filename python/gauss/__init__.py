@@ -34,6 +34,7 @@ from gauss.mcp import McpServer
 from gauss.memory import Memory
 from gauss.middleware import MiddlewareChain
 from gauss.network import Network
+from gauss.team import Team
 from gauss.pipeline import (
     compose,
     compose_async,
@@ -97,6 +98,7 @@ __all__ = [
     "Graph",
     "Workflow",
     "Network",
+    "Team",
     # Middleware & Plugins
     "MiddlewareChain",
     "PluginRegistry",
