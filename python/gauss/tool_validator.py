@@ -21,7 +21,7 @@ class ToolValidator:
     def __init__(self, strategies: list[str] | None = None) -> None:
         from gauss._native import create_tool_validator  # type: ignore[import-not-found]
 
-        self._handle: int = create_tool_validator(json.dumps(strategies or []))
+        self._handle: int = create_tool_validator(strategies)
         self._destroyed = False
 
     def validate(self, input_data: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:

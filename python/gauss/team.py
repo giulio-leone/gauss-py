@@ -91,7 +91,7 @@ class Team:
         from gauss.agent import _run_native
 
         self._check_alive()
-        messages = json.dumps([{"role": "user", "content": prompt}])
+        messages = json.dumps([{"role": "user", "content": [{"type": "text", "text": prompt}]}])
         result_json = _run_native(team_run, self._handle, messages)
         return json.loads(result_json)  # type: ignore[no-any-return]
 
