@@ -151,6 +151,8 @@ class Agent:
             options["max_tokens"] = self._config.max_tokens
         if self._config.stop_condition:
             options["stop_on_tool"] = self._config.stop_condition
+        if self._config.thinking_budget is not None:
+            options["thinking_budget"] = self._config.thinking_budget
 
         result_json = _run_native(
             agent_run,
@@ -166,6 +168,7 @@ class Agent:
             messages=data.get("messages", []),
             tool_calls=data.get("toolCalls", []),
             usage=data.get("usage", {}),
+            thinking=data.get("thinking"),
         )
 
     def generate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:

@@ -54,6 +54,7 @@ class AgentResult:
     messages: list[dict[str, Any]]
     tool_calls: list[dict[str, Any]]
     usage: dict[str, Any]
+    thinking: str | None = None
 
     def __str__(self) -> str:
         return self.text
@@ -101,6 +102,7 @@ class AgentConfig:
     max_retries: int = 3
     tools: list[ToolDef] = field(default_factory=list)
     stop_condition: str | None = None
+    thinking_budget: int | None = None
 
     def resolve(self) -> tuple[ProviderType, str, str]:
         """Resolve provider, model, and API key from config or env."""
