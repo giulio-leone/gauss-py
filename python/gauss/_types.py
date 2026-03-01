@@ -107,6 +107,39 @@ class ProviderCapabilities:
 
 
 @dataclass
+class CodeExecutionOptions:
+    """Configuration for programmatic tool calling (code execution).
+
+    Example::
+
+        # Enable all runtimes
+        opts = CodeExecutionOptions()
+
+        # Python only with 60s timeout
+        opts = CodeExecutionOptions(python=True, javascript=False, bash=False, timeout=60)
+    """
+
+    python: bool = True
+    javascript: bool = True
+    bash: bool = True
+    unified: bool = False
+    timeout: int = 30
+    sandbox: Literal["default", "strict", "permissive"] = "default"
+
+
+@dataclass
+class CodeExecutionResult:
+    """Result from code execution."""
+
+    stdout: str
+    stderr: str
+    exit_code: int
+    timed_out: bool
+    runtime: str
+    success: bool
+
+
+@dataclass
 class AgentConfig:
     """Agent configuration with sensible defaults.
 
@@ -125,6 +158,10 @@ class AgentConfig:
             api_key="sk-...",
             temperature=0.7,
         )
+
+        # With code execution
+        config = AgentConfig(code_execution=True)
+        config = AgentConfig(code_execution=CodeExecutionOptions(python=True))
     """
 
     name: str = "gauss-agent"
@@ -140,6 +177,7 @@ class AgentConfig:
     stop_condition: str | None = None
     thinking_budget: int | None = None
     cache_control: bool = False
+    code_execution: bool | CodeExecutionOptions | None = None
 
     def resolve(self) -> tuple[ProviderType, str, str]:
         """Resolve provider, model, and API key from config or env."""

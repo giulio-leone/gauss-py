@@ -22,7 +22,16 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from gauss._types import AgentConfig, AgentResult, Citation, Message, ProviderCapabilities, ToolDef
+from gauss._types import (
+    AgentConfig,
+    AgentResult,
+    Citation,
+    CodeExecutionOptions,
+    CodeExecutionResult,
+    Message,
+    ProviderCapabilities,
+    ToolDef,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -155,6 +164,19 @@ class Agent:
             options["thinking_budget"] = self._config.thinking_budget
         if self._config.cache_control:
             options["cache_control"] = True
+        if self._config.code_execution is not None:
+            if self._config.code_execution is True:
+                options["code_execution"] = True
+            elif isinstance(self._config.code_execution, CodeExecutionOptions):
+                ce = self._config.code_execution
+                options["code_execution"] = {
+                    "python": ce.python,
+                    "javascript": ce.javascript,
+                    "bash": ce.bash,
+                    "unified": ce.unified,
+                    "timeout": ce.timeout,
+                    "sandbox": ce.sandbox,
+                }
 
         result_json = _run_native(
             agent_run,
@@ -255,6 +277,63 @@ class Agent:
             temperature=self._config.temperature,
             max_tokens=self._config.max_tokens,
         )
+
+    # ── Code Execution ────────────────────────────────────────────────
+
+    @staticmethod
+    def execute_code(
+        language: str,
+        code: str,
+        *,
+        timeout: int = 30,
+        sandbox: str = "default",
+    ) -> CodeExecutionResult:
+        """Execute code in a sandboxed runtime.
+
+        Args:
+            language: "python", "javascript", or "bash"
+            code: Source code to execute
+            timeout: Max execution time in seconds (default: 30)
+            sandbox: "default", "strict", or "permissive"
+
+        Returns:
+            CodeExecutionResult with stdout, stderr, exit_code, etc.
+
+        Example::
+
+            result = Agent.execute_code("python", "print(42)")
+            assert result.stdout.strip() == "42"
+        """
+        from gauss._native import execute_code as _exec  # type: ignore[import-not-found]
+
+        result_json = _run_native(_exec, language, code, timeout, None, sandbox)
+        data = json.loads(result_json)
+        return CodeExecutionResult(
+            stdout=data.get("stdout", ""),
+            stderr=data.get("stderr", ""),
+            exit_code=data.get("exit_code", -1),
+            timed_out=data.get("timed_out", False),
+            runtime=data.get("runtime", language),
+            success=data.get("success", False),
+        )
+
+    @staticmethod
+    def available_runtimes() -> list[str]:
+        """Check which code execution runtimes are available on this system.
+
+        Returns:
+            List of runtime names, e.g. ["python", "bash"]
+
+        Example::
+
+            runtimes = Agent.available_runtimes()
+            if "python" in runtimes:
+                result = Agent.execute_code("python", "print('ok')")
+        """
+        from gauss._native import available_runtimes as _runtimes  # type: ignore[import-not-found]
+
+        result_json = _run_native(_runtimes)
+        return json.loads(result_json)
 
     # ── Tool Management ────────────────────────────────────────────────
 
