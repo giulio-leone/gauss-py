@@ -105,6 +105,26 @@ class Agent:
     """
 
     def __init__(self, config: AgentConfig | None = None, **kwargs: Any) -> None:
+        """Initialize the Agent with an optional configuration.
+
+        If no ``config`` is provided, keyword arguments are forwarded to
+        :class:`AgentConfig`.  When neither is given, the provider, model,
+        and API key are auto-detected from environment variables.
+
+        Args:
+            config: Explicit agent configuration.  When ``None``, an
+                :class:`AgentConfig` is built from ``**kwargs``.
+            **kwargs: Forwarded to :class:`AgentConfig` when *config* is
+                ``None``.  Common keys: ``provider``, ``model``,
+                ``api_key``, ``system_prompt``, ``temperature``.
+
+        Raises:
+            OSError: If no API key can be resolved from the environment.
+
+        Example:
+            >>> agent = Agent()
+            >>> agent = Agent(model="gpt-4o", temperature=0.5)
+        """
         from gauss._native import (  # type: ignore[import-not-found]
             create_provider,
             destroy_provider,
@@ -129,18 +149,28 @@ class Agent:
     # ── Execution ──────────────────────────────────────────────────────
 
     def run(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentResult:
-        """Run the agent with a prompt or message list.
+        """Run the agent synchronously and return the full result.
+
+        Sends the prompt (or message history) to the configured LLM provider
+        and returns a structured result including the generated text, token
+        usage, and any tool calls requested by the model.
 
         Args:
-            prompt: A string (auto-wrapped as user message) or list of messages.
+            prompt: A plain string (auto-wrapped as a ``user`` message) or
+                a sequence of :class:`Message` / raw ``dict`` objects
+                representing a conversation history.
 
         Returns:
-            AgentResult with .text, .messages, .tool_calls, .usage
+            :class:`AgentResult` containing ``text``, ``messages``,
+            ``tool_calls``, ``usage``, and optional ``thinking`` /
+            ``citations`` fields.
 
-        Example::
+        Raises:
+            RuntimeError: If the agent has already been destroyed.
 
-            result = agent.run("What is 2+2?")
-            print(result.text)
+        Example:
+            >>> result = agent.run("What is 2+2?")
+            >>> print(result.text)
         """
         from gauss._native import agent_run  # type: ignore[import-not-found]
 
@@ -229,11 +259,22 @@ class Agent:
         )
 
     def generate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:
-        """Simple text generation — returns just the text.
+        """Generate text and return only the response string.
 
-        Example::
+        A convenience wrapper around :meth:`run` that discards metadata
+        and returns just the generated text.
 
-            text = agent.generate("Write a haiku about Rust")
+        Args:
+            prompt: A plain string or sequence of messages.
+
+        Returns:
+            The generated text as a plain ``str``.
+
+        Raises:
+            RuntimeError: If the agent has already been destroyed.
+
+        Example:
+            >>> text = agent.generate("Write a haiku about Rust")
         """
         from gauss._native import generate  # type: ignore[import-not-found]
 
@@ -253,7 +294,21 @@ class Agent:
 
     @property
     def capabilities(self) -> ProviderCapabilities:
-        """Query what features this provider/model supports."""
+        """Query the feature capabilities of the current provider and model.
+
+        Returns:
+            :class:`ProviderCapabilities` with boolean flags for
+            ``streaming``, ``tool_use``, ``vision``, ``extended_thinking``,
+            ``image_generation``, and more.
+
+        Raises:
+            RuntimeError: If the agent has already been destroyed.
+
+        Example:
+            >>> caps = agent.capabilities
+            >>> if caps.streaming:
+            ...     print("Streaming supported")
+        """
         from gauss._native import get_provider_capabilities  # type: ignore[import-not-found]
 
         self._check_alive()
@@ -276,13 +331,26 @@ class Agent:
         )
 
     def stream_iter(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentStream:
-        """Return an async iterable stream of events.
+        """Return an async-iterable stream of events for the given prompt.
 
-        Example::
+        Each yielded :class:`StreamEvent` represents an incremental chunk
+        of the model response (text deltas, tool calls, etc.).  After
+        iteration completes, the full aggregated text is available via
+        ``stream.text``.
 
-            async for event in agent.stream_iter("Tell me a story"):
-                if event.type == "text_delta":
-                    print(event.text, end="", flush=True)
+        Args:
+            prompt: A plain string or sequence of messages.
+
+        Returns:
+            An :class:`AgentStream` that can be used with ``async for``.
+
+        Raises:
+            RuntimeError: If the agent has already been destroyed.
+
+        Example:
+            >>> async for event in agent.stream_iter("Tell me a story"):
+            ...     if event.type == "text_delta":
+            ...         print(event.text, end="", flush=True)
         """
         self._check_alive()
         messages = self._normalize_messages(prompt)
@@ -296,27 +364,80 @@ class Agent:
     # ── Tool Management ────────────────────────────────────────────────
 
     def add_tool(self, tool: ToolDef) -> Agent:
-        """Add a tool definition. Returns self for chaining."""
+        """Register a single tool definition with the agent.
+
+        Args:
+            tool: A :class:`ToolDef` describing the tool's name,
+                description, and JSON-Schema parameters.
+
+        Returns:
+            The same :class:`Agent` instance, allowing method chaining.
+
+        Example:
+            >>> agent.add_tool(ToolDef(name="get_weather", description="..."))
+        """
         self._tools.append(tool)
         return self
 
     def add_tools(self, tools: Sequence[ToolDef]) -> Agent:
-        """Add multiple tools. Returns self for chaining."""
+        """Register multiple tool definitions at once.
+
+        Args:
+            tools: A sequence of :class:`ToolDef` objects.
+
+        Returns:
+            The same :class:`Agent` instance, allowing method chaining.
+
+        Example:
+            >>> agent.add_tools([weather_tool, search_tool])
+        """
         self._tools.extend(tools)
+        return self
+
+    def set_options(self, **kwargs: Any) -> Agent:
+        """Update runtime configuration options.
+
+        Merges the provided keyword arguments into the agent's existing
+        configuration, allowing you to tweak behaviour between runs
+        without recreating the agent.
+
+        Args:
+            **kwargs: Configuration keys to update.  Accepted keys include
+                ``temperature``, ``max_tokens``, ``system_prompt``,
+                ``thinking_budget``, ``reasoning_effort``,
+                ``cache_control``, ``code_execution``, ``grounding``,
+                ``stop_condition``, and any other :class:`AgentConfig` field.
+
+        Returns:
+            The same :class:`Agent` instance, allowing method chaining.
+
+        Example:
+            >>> agent.set_options(temperature=0.9, max_tokens=2048)
+        """
+        for key, value in kwargs.items():
+            if hasattr(self._config, key):
+                setattr(self._config, key, value)
         return self
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
     def destroy(self) -> None:
-        """Release native resources."""
+        """Release native (Rust) resources held by this agent.
+
+        Safe to call multiple times; subsequent calls are no-ops.
+        Automatically invoked when the agent is used as a context manager
+        or garbage-collected.
+        """
         if not self._destroyed:
             self._destroy_provider(self._provider_handle)
             self._destroyed = True
 
     def __enter__(self) -> Agent:
+        """Enter the context manager, returning this agent instance."""
         return self
 
     def __exit__(self, *_: Any) -> None:
+        """Exit the context manager and release native resources."""
         self.destroy()
 
     def __del__(self) -> None:
@@ -330,7 +451,7 @@ class Agent:
 
     @property
     def handle(self) -> int:
-        """The native provider handle (for advanced use)."""
+        """Return the native provider handle for advanced / low-level use."""
         return self._provider_handle
 
     @staticmethod
@@ -349,14 +470,24 @@ class Agent:
 
 
 def gauss(prompt: str, **kwargs: Any) -> str:
-    """One-liner AI call. Auto-detects provider from env.
+    """One-liner AI call — send a prompt and get text back.
 
-    Example::
+    Creates a temporary :class:`Agent`, runs the prompt, and returns
+    the generated text.  Provider, model, and API key are auto-detected
+    from environment variables unless overridden via ``**kwargs``.
 
-        from gauss import gauss
+    Args:
+        prompt: The user prompt string.
+        **kwargs: Forwarded to :class:`AgentConfig` (e.g. ``model``,
+            ``temperature``, ``provider``).
 
-        answer = gauss("What is the meaning of life?")
-        print(answer)
+    Returns:
+        The generated text as a plain ``str``.
+
+    Example:
+        >>> from gauss import gauss
+        >>> answer = gauss("What is the meaning of life?")
+        >>> print(answer)
     """
     with Agent(AgentConfig(**kwargs)) as agent:
         return agent.run(prompt).text

@@ -24,13 +24,23 @@ def parse_partial_json(text: str) -> Any:
 
 @dataclass
 class StreamEvent:
-    """A single event from a streaming response.
+    """A single event emitted during a streaming response.
+
+    Events are produced incrementally as the model generates its reply.
+    The ``type`` field determines which payload fields are populated.
 
     Attributes:
-        type: Event type (e.g., "text_delta", "tool_call", "raw").
-        text: Text content (for text_delta events).
-        tool_call: Tool call info dict (for tool_call events).
-        raw: Raw data dict for any extra fields.
+        type: Event kind — ``"text_delta"``, ``"tool_call_delta"``,
+            ``"raw"``, or other provider-specific types.
+        text: The text fragment (populated for ``text_delta`` events).
+        tool_call: Tool-call payload dict (populated for
+            ``tool_call_delta`` events).
+        raw: Full raw event data for introspection or custom handling.
+
+    Example:
+        >>> event = StreamEvent(type="text_delta", text="Hello")
+        >>> event.text
+        'Hello'
     """
 
     type: str
@@ -40,7 +50,16 @@ class StreamEvent:
 
     @classmethod
     def from_json(cls, json_str: str | dict[str, Any]) -> StreamEvent:
-        """Parse a JSON string or dict into a StreamEvent."""
+        """Parse a JSON string or dict into a ``StreamEvent``.
+
+        Args:
+            json_str: A raw JSON string or an already-parsed dict
+                representing a single streaming event.
+
+        Returns:
+            A :class:`StreamEvent` with ``type``, ``text``, and/or
+            ``tool_call`` fields populated based on the event data.
+        """
         if isinstance(json_str, dict):
             data = json_str
         else:
@@ -70,19 +89,21 @@ class StreamEvent:
 
 
 class AgentStream:
-    """Async iterable wrapper over native streaming.
+    """Async-iterable wrapper over a native streaming response.
 
-    Yields :class:`StreamEvent` objects and provides the full aggregated
-    text after iteration via :attr:`text`.
+    Yields :class:`StreamEvent` objects one at a time.  After the
+    iteration completes, the full aggregated text is available via the
+    :attr:`text` property.
 
-    Example::
+    Use :meth:`Agent.stream_iter` to obtain an instance — do not
+    construct directly.
 
-        stream = agent.stream_iter("Tell me a story")
-        async for event in stream:
-            if event.type == "text_delta":
-                print(event.text, end="", flush=True)
-        print()
-        print("Full text:", stream.text)
+    Example:
+        >>> stream = agent.stream_iter("Tell me a story")
+        >>> async for event in stream:
+        ...     if event.type == "text_delta":
+        ...         print(event.text, end="", flush=True)
+        >>> print(stream.text)
     """
 
     def __init__(
@@ -93,6 +114,14 @@ class AgentStream:
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> None:
+        """Initialise the stream (internal — prefer ``Agent.stream_iter``).
+
+        Args:
+            provider_handle: Opaque native provider handle.
+            messages: Normalised message list.
+            temperature: Sampling temperature override.
+            max_tokens: Maximum tokens override.
+        """
         self._provider_handle = provider_handle
         self._messages = messages
         self._temperature = temperature
@@ -102,15 +131,27 @@ class AgentStream:
 
     @property
     def text(self) -> str | None:
-        """Aggregated text from all text_delta events (available after iteration)."""
+        """Full aggregated text from all ``text_delta`` events.
+
+        Returns:
+            The concatenated text after iteration finishes, or ``None``
+            if iteration has not yet completed.
+        """
         return self._text
 
     @property
     def events(self) -> list[StreamEvent]:
-        """All events yielded during iteration."""
+        """Return a copy of all events yielded so far during iteration."""
         return list(self._events)
 
     async def __aiter__(self) -> AsyncIterator[StreamEvent]:
+        """Asynchronously iterate over streaming events.
+
+        Yields:
+            :class:`StreamEvent` objects in the order received from the
+            provider.  After the iterator is exhausted, :attr:`text`
+            contains the full concatenated response.
+        """
         from gauss._native import stream_generate  # type: ignore[import-not-found]
         import inspect
 

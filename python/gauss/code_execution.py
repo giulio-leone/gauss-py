@@ -64,21 +64,27 @@ def execute_code(
     timeout: int = 30,
     sandbox: str = "default",
 ) -> CodeExecutionResult:
-    """Execute code in a sandboxed runtime.
+    """Execute code in a sandboxed runtime and return the result.
+
+    Runs the given source code using a local runtime managed by the
+    Gauss native engine.  No :class:`Agent` instance is required.
 
     Args:
-        language: "python", "javascript", or "bash"
-        code: Source code to execute
-        timeout: Max execution time in seconds (default: 30)
-        sandbox: "default", "strict", or "permissive"
+        language: Runtime identifier — ``"python"``, ``"javascript"``,
+            or ``"bash"``.
+        code: Source code to execute.
+        timeout: Maximum execution time in seconds.  Defaults to ``30``.
+        sandbox: Sandbox policy — ``"default"``, ``"strict"``, or
+            ``"permissive"``.
 
     Returns:
-        CodeExecutionResult with stdout, stderr, exit_code, etc.
+        :class:`CodeExecutionResult` with ``stdout``, ``stderr``,
+        ``exit_code``, ``timed_out``, ``runtime``, and ``success``
+        fields.
 
-    Example::
-
-        result = execute_code("python", "print(42)")
-        assert result.stdout.strip() == "42"
+    Example:
+        >>> result = execute_code("python", "print(42)")
+        >>> assert result.stdout.strip() == "42"
     """
     from gauss._native import execute_code as _exec  # type: ignore[import-not-found]
 
@@ -95,10 +101,18 @@ def execute_code(
 
 
 def available_runtimes() -> list[str]:
-    """Check which code execution runtimes are available on this system.
+    """Return the code-execution runtimes available on this system.
+
+    Queries the native engine for installed language runtimes that
+    can be used with :func:`execute_code`.
 
     Returns:
-        List of runtime names, e.g. ["python", "bash"]
+        A list of runtime name strings, e.g. ``["python", "bash"]``.
+
+    Example:
+        >>> runtimes = available_runtimes()
+        >>> "python" in runtimes
+        True
     """
     from gauss._native import available_runtimes as _runtimes  # type: ignore[import-not-found]
 
@@ -120,12 +134,36 @@ def generate_image(
     n: int | None = None,
     response_format: str | None = None,
 ) -> ImageGenerationResult:
-    """Generate images using a provider's image generation API.
+    """Generate images from a text prompt using a provider's image API.
 
-    Example::
+    Creates a temporary provider connection, sends the generation
+    request, and returns the resulting images.  No :class:`Agent`
+    instance is required.
 
-        result = generate_image("A sunset over mountains", model="dall-e-3")
-        print(result.images[0].url)
+    Args:
+        prompt: Text description of the desired image.
+        provider: LLM provider to use.  Auto-detected from environment
+            when ``None``.
+        model: Model name (e.g. ``"dall-e-3"``).  Defaults to the
+            provider's default model.
+        api_key: API key override.  Resolved from environment when
+            ``None``.
+        base_url: Custom base URL for the provider API.
+        size: Image dimensions, e.g. ``"1024x1024"``.
+        quality: Quality preset (provider-specific, e.g. ``"hd"``).
+        style: Style preset (provider-specific, e.g. ``"vivid"``).
+        aspect_ratio: Aspect ratio string, e.g. ``"16:9"`` (Gemini).
+        n: Number of images to generate.
+        response_format: Desired format — ``"url"`` or ``"b64_json"``.
+
+    Returns:
+        :class:`ImageGenerationResult` containing a list of
+        :class:`GeneratedImageData` objects (each with ``url`` and/or
+        ``base64``) and an optional ``revised_prompt``.
+
+    Example:
+        >>> result = generate_image("A sunset over mountains", model="dall-e-3")
+        >>> print(result.images[0].url)
     """
     from gauss._native import (  # type: ignore[import-not-found]
         create_provider,
