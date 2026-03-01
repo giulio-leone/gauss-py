@@ -21,7 +21,7 @@ _mock_native.agent_run.return_value = json.dumps({
     "toolCalls": [],
     "usage": {"total_tokens": 10},
 })
-_mock_native.generate.return_value = "Hello from Gauss!"
+_mock_native.generate.return_value = json.dumps({"text": "Hello from Gauss!"})
 _mock_native.create_memory.return_value = 2
 _mock_native.memory_store.return_value = None
 _mock_native.memory_recall.return_value = json.dumps([
@@ -109,14 +109,14 @@ _mock_native.tool_validator_validate.return_value = json.dumps({"valid": True})
 _mock_native.destroy_tool_validator.return_value = None
 _mock_native.py_parse_partial_json.return_value = json.dumps({"partial": True})
 
-# stream_generate returns a JSON array of JSON strings (each is a serialized event)
+# stream_generate returns a JSON array of event objects (adjacently tagged)
 import asyncio
 
 async def _mock_stream_generate(provider_handle, messages_json, temperature=None, max_tokens=None):
     return json.dumps([
-        '{"type":"text_delta","text":"Hello"}',
-        '{"type":"text_delta","text":" World"}',
-        '{"type":"done"}',
+        {"type": "text_delta", "data": "Hello"},
+        {"type": "text_delta", "data": " World"},
+        {"type": "done"},
     ])
 
 _mock_native.stream_generate = _mock_stream_generate
@@ -679,10 +679,9 @@ class TestAgentStream:
 
     def test_stream_event_from_json_valid(self) -> None:
         from gauss.agent import StreamEvent
-        event = StreamEvent.from_json('{"type":"text_delta","text":"hi","extra":1}')
+        event = StreamEvent.from_json('{"type":"text_delta","data":"hi"}')
         assert event.type == "text_delta"
         assert event.text == "hi"
-        assert event.raw == {"extra": 1}
 
     def test_stream_exports(self) -> None:
         from gauss import AgentStream, StreamEvent

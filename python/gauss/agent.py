@@ -28,6 +28,30 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+def _run_native(func: Any, *args: Any) -> Any:
+    """Call a native function that may return a coroutine or a plain value."""
+    import asyncio
+    import inspect
+
+    result = func(*args)
+    if not inspect.isawaitable(result):
+        return result
+
+    async def _call() -> Any:
+        return await result
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            return pool.submit(asyncio.run, _call()).result()
+    return asyncio.run(_call())
+
+
 class Agent:
     """Production-grade AI agent powered by Rust.
 
@@ -98,16 +122,25 @@ class Agent:
         self._check_alive()
         messages = self._normalize_messages(prompt)
         messages_json = json.dumps(messages)
-        tools_json = json.dumps([t.to_dict() for t in self._tools]) if self._tools else "[]"
 
-        result_json: str = agent_run(
+        options: dict[str, Any] = {}
+        if self._tools:
+            options["tools"] = [t.to_dict() for t in self._tools]
+        if self._config.system_prompt:
+            options["instructions"] = self._config.system_prompt
+        if self._config.temperature is not None:
+            options["temperature"] = self._config.temperature
+        if self._config.max_tokens is not None:
+            options["max_tokens"] = self._config.max_tokens
+        if self._config.stop_condition:
+            options["stop_on_tool"] = self._config.stop_condition
+
+        result_json = _run_native(
+            agent_run,
+            self._config.name,
             self._provider_handle,
             messages_json,
-            tools_json,
-            self._config.system_prompt,
-            self._config.temperature,
-            self._config.max_tokens,
-            self._config.stop_condition,
+            json.dumps(options) if options else None,
         )
 
         data = json.loads(result_json)
@@ -130,12 +163,16 @@ class Agent:
         self._check_alive()
         messages = self._normalize_messages(prompt)
 
-        return generate(
+        result_json = _run_native(
+            generate,
             self._provider_handle,
             json.dumps(messages),
             self._config.temperature,
             self._config.max_tokens,
         )
+
+        data = json.loads(result_json)
+        return data.get("text", "")
 
     def stream_iter(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentStream:
         """Return an async iterable stream of events.
@@ -262,17 +299,33 @@ class StreamEvent:
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_json(cls, json_str: str) -> StreamEvent:
-        """Parse a JSON string into a StreamEvent."""
-        try:
-            data = json.loads(json_str)
-        except json.JSONDecodeError:
-            return cls(type="raw", text=json_str)
+    def from_json(cls, json_str: str | dict[str, Any]) -> StreamEvent:
+        """Parse a JSON string or dict into a StreamEvent."""
+        if isinstance(json_str, dict):
+            data = json_str
+        else:
+            try:
+                data = json.loads(json_str)
+            except json.JSONDecodeError:
+                return cls(type="raw", text=json_str)
+
+        event_type = data.get("type", "unknown")
+        event_data = data.get("data")
+
+        text = None
+        tool_call = None
+        if event_type == "text_delta" and isinstance(event_data, str):
+            text = event_data
+        elif event_type == "tool_call_delta" and isinstance(event_data, dict):
+            tool_call = event_data
+        elif isinstance(event_data, str):
+            text = event_data
+
         return cls(
-            type=data.get("type", "unknown"),
-            text=data.get("text"),
-            tool_call=data.get("toolCall"),
-            raw={k: v for k, v in data.items() if k not in ("type", "text", "toolCall")},
+            type=event_type,
+            text=text,
+            tool_call=tool_call,
+            raw={k: v for k, v in data.items() if k not in ("type",)},
         )
 
 
@@ -319,14 +372,19 @@ class AgentStream:
 
     async def __aiter__(self) -> AsyncIterator[StreamEvent]:
         from gauss._native import stream_generate  # type: ignore[import-not-found]
+        import inspect
 
         messages_json = json.dumps(self._messages)
-        result_json: str = await stream_generate(
+        result = stream_generate(
             self._provider_handle,
             messages_json,
             self._temperature,
             self._max_tokens,
         )
+        if inspect.isawaitable(result):
+            result_json = await result
+        else:
+            result_json = result
 
         raw_events: list[str] = json.loads(result_json)
         parts: list[str] = []
