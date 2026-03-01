@@ -83,6 +83,7 @@ from gauss.tokens import (
 from gauss.tool_validator import ToolValidator
 from gauss.vector_store import VectorStore
 from gauss.workflow import Workflow
+from gauss.spec import AgentSpec, AgentToolSpec, SkillSpec, SkillStep, SkillParam, discover_agents
 
 __all__ = [
     # One-liner
@@ -170,4 +171,11 @@ __all__ = [
     "reduce_sync",
     "compose",
     "compose_async",
+    # AGENTS.MD & SKILL.MD Parsers
+    "AgentSpec",
+    "AgentToolSpec",
+    "SkillSpec",
+    "SkillStep",
+    "SkillParam",
+    "discover_agents",
 ]
