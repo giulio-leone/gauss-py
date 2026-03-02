@@ -63,12 +63,19 @@ class TestControlPlane:
         with urllib.request.urlopen(f"{url}/api/ops/capabilities") as resp:
             caps = json.loads(resp.read().decode("utf-8"))
             assert caps["supports_multiplex"] is True
+            assert caps["supports_ops_summary"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
             assert health["status"] == "ok"
             assert health["history_size"] >= 1
+
+        with urllib.request.urlopen(f"{url}/api/ops/summary") as resp:
+            summary = json.loads(resp.read().decode("utf-8"))
+            assert summary["status"] == "ok"
+            assert summary["history_size"] >= 1
+            assert summary["spans_count"] >= 1
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")

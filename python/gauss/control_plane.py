@@ -208,6 +208,12 @@ class ControlPlane:
                         self._send_json(payload)
                         return
 
+                    if parsed.path == "/api/ops/summary":
+                        filters = outer._apply_auth_claims(outer._parse_context_filters(params))
+                        payload = json.dumps(outer._ops_summary(filters), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
                     if parsed.path == "/api/stream":
                         filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         channels = outer._parse_stream_channels(params)
@@ -581,6 +587,7 @@ class ControlPlane:
             "supports_multiplex": True,
             "supports_replay_cursor": True,
             "supports_channel_rbac": True,
+            "supports_ops_summary": True,
             "hosted_dashboard_path": "/ops",
         }
 
@@ -590,6 +597,61 @@ class ControlPlane:
             "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
             "history_size": len(self._history),
             "stream_buffer_size": len(self._stream_events),
+        }
+
+    def _ops_summary(self, filters: dict[str, str | None] | None = None) -> dict[str, Any]:
+        history = self._filter_history(filters)
+        latest = history[-1] if history else None
+        spans = latest.get("spans") if isinstance(latest, dict) else None
+        pending_approvals = latest.get("pending_approvals") if isinstance(latest, dict) else None
+
+        if filters and any(filters.get(key) for key in ("tenant_id", "session_id", "run_id")):
+            stream_buffer_size = len(
+                [
+                    event
+                    for event in self._stream_events
+                    if self._matches_context(
+                        event.get("context"),
+                        filters.get("tenant_id"),
+                        filters.get("session_id"),
+                        filters.get("run_id"),
+                    )
+                ]
+            )
+        else:
+            stream_buffer_size = len(self._stream_events)
+
+        tenants: set[str] = set()
+        sessions: set[str] = set()
+        runs: set[str] = set()
+        for item in history:
+            context = item.get("context", {}) if isinstance(item, dict) else {}
+            if isinstance(context, dict):
+                if context.get("tenant_id"):
+                    tenants.add(str(context["tenant_id"]))
+                if context.get("session_id"):
+                    sessions.add(str(context["session_id"]))
+                if context.get("run_id"):
+                    runs.add(str(context["run_id"]))
+
+        latest_cost = latest.get("latest_cost") if isinstance(latest, dict) else None
+        latest_total_cost = (
+            float(latest_cost.get("total_cost_usd", 0.0))
+            if isinstance(latest_cost, dict)
+            else 0.0
+        )
+
+        return {
+            "status": "ok",
+            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "history_size": len(history),
+            "stream_buffer_size": stream_buffer_size,
+            "spans_count": len(spans) if isinstance(spans, list) else 0,
+            "pending_approvals_count": len(pending_approvals) if isinstance(pending_approvals, list) else 0,
+            "latest_total_cost_usd": latest_total_cost,
+            "tenant_count": len(tenants),
+            "session_count": len(sessions),
+            "run_count": len(runs),
         }
 
     def _render_hosted_ops_html(self) -> str:
