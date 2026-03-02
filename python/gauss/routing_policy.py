@@ -20,6 +20,7 @@ class RoutingPolicy:
     aliases: dict[str, list[RoutingCandidate]] = field(default_factory=dict)
     fallback_order: list[ProviderType] = field(default_factory=list)
     max_total_cost_usd: float | None = None
+    max_requests_per_minute: int | None = None
 
 
 class RoutingPolicyError(ValueError):
@@ -33,9 +34,12 @@ def resolve_routing_target(
     *,
     available_providers: list[ProviderType] | None = None,
     estimated_cost_usd: float | None = None,
+    current_requests_per_minute: int | None = None,
 ) -> tuple[ProviderType, str]:
     if estimated_cost_usd is not None:
         enforce_routing_cost_limit(policy, estimated_cost_usd)
+    if current_requests_per_minute is not None:
+        enforce_routing_rate_limit(policy, current_requests_per_minute)
 
     if policy is None:
         return provider, model
@@ -72,3 +76,13 @@ def enforce_routing_cost_limit(
         return
     if cost_usd > policy.max_total_cost_usd:
         raise RoutingPolicyError(f"routing policy rejected cost {cost_usd}")
+
+
+def enforce_routing_rate_limit(
+    policy: RoutingPolicy | None,
+    requests_per_minute: int,
+) -> None:
+    if policy is None or policy.max_requests_per_minute is None:
+        return
+    if requests_per_minute > policy.max_requests_per_minute:
+        raise RoutingPolicyError(f"routing policy rejected rate {requests_per_minute}")

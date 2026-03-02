@@ -167,6 +167,7 @@ routed_agent = Agent(
         },
         fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI],
         max_total_cost_usd=2.0,
+        max_requests_per_minute=60,
     ),
 )
 ```

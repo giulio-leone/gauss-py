@@ -89,6 +89,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "resolve_routing_target": ("gauss.routing_policy", "resolve_routing_target"),
     "resolve_fallback_provider": ("gauss.routing_policy", "resolve_fallback_provider"),
     "enforce_routing_cost_limit": ("gauss.routing_policy", "enforce_routing_cost_limit"),
+    "enforce_routing_rate_limit": ("gauss.routing_policy", "enforce_routing_rate_limit"),
     # config
     "parse_agent_config": ("gauss.config", "parse_agent_config"),
     "resolve_env": ("gauss.config", "resolve_env"),
@@ -319,6 +320,7 @@ __all__ = [
     "resolve_routing_target",
     "resolve_fallback_provider",
     "enforce_routing_cost_limit",
+    "enforce_routing_rate_limit",
     # MCP
     "McpServer",
     "McpResource",

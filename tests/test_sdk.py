@@ -290,12 +290,22 @@ class TestAgent:
         assert model == "gpt-5.2"
 
     def test_routing_policy_cost_limit_helper(self) -> None:
-        from gauss.routing_policy import RoutingPolicy, RoutingPolicyError, enforce_routing_cost_limit
+        from gauss.routing_policy import (
+            RoutingPolicy,
+            RoutingPolicyError,
+            enforce_routing_cost_limit,
+            enforce_routing_rate_limit,
+        )
 
         policy = RoutingPolicy(max_total_cost_usd=1.0)
         enforce_routing_cost_limit(policy, 0.5)
         with pytest.raises(RoutingPolicyError, match="routing policy rejected cost 1.5"):
             enforce_routing_cost_limit(policy, 1.5)
+
+        policy.max_requests_per_minute = 10
+        enforce_routing_rate_limit(policy, 10)
+        with pytest.raises(RoutingPolicyError, match="routing policy rejected rate 11"):
+            enforce_routing_rate_limit(policy, 11)
 
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
