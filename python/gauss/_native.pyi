@@ -20,6 +20,15 @@ def destroy_provider(handle: int) -> None: ...
 
 def get_provider_capabilities(provider_handle: int) -> str: ...
 
+def estimate_cost(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    reasoning_tokens: int | None = None,
+    cache_read_tokens: int | None = None,
+    cache_creation_tokens: int | None = None,
+) -> str: ...
+
 # --- Agent ---
 
 async def agent_run(
@@ -220,6 +229,12 @@ def create_middleware_chain() -> int: ...
 def middleware_use_logging(handle: int) -> None: ...
 
 def middleware_use_caching(handle: int, ttl_ms: int) -> None: ...
+
+def middleware_use_rate_limit(
+    handle: int,
+    requests_per_minute: int,
+    burst: int | None = None,
+) -> None: ...
 
 def destroy_middleware_chain(handle: int) -> None: ...
 

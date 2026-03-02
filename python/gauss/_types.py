@@ -17,6 +17,12 @@ class ProviderType(str, Enum):
     GROQ = "groq"
     OLLAMA = "ollama"
     DEEPSEEK = "deepseek"
+    OPENROUTER = "openrouter"
+    TOGETHER = "together"
+    FIREWORKS = "fireworks"
+    MISTRAL = "mistral"
+    PERPLEXITY = "perplexity"
+    XAI = "xai"
 
 
 @dataclass
@@ -105,6 +111,26 @@ class ProviderCapabilities:
     grounding: bool = False
     code_execution: bool = False
     web_search: bool = False
+
+
+@dataclass
+class CostEstimate:
+    """Estimated request cost from token usage."""
+
+    model: str
+    normalized_model: str
+    currency: str
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    input_cost_usd: float
+    output_cost_usd: float
+    reasoning_cost_usd: float
+    cache_read_cost_usd: float
+    cache_creation_cost_usd: float
+    total_cost_usd: float
 
 
 @dataclass
@@ -262,6 +288,12 @@ _ENV_MAP: dict[ProviderType, str] = {
     ProviderType.GOOGLE: "GOOGLE_API_KEY",
     ProviderType.GROQ: "GROQ_API_KEY",
     ProviderType.DEEPSEEK: "DEEPSEEK_API_KEY",
+    ProviderType.OPENROUTER: "OPENROUTER_API_KEY",
+    ProviderType.TOGETHER: "TOGETHER_API_KEY",
+    ProviderType.FIREWORKS: "FIREWORKS_API_KEY",
+    ProviderType.MISTRAL: "MISTRAL_API_KEY",
+    ProviderType.PERPLEXITY: "PERPLEXITY_API_KEY",
+    ProviderType.XAI: "XAI_API_KEY",
 }
 
 from gauss.models import (
@@ -279,6 +311,12 @@ _DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.GROQ: PROVIDER_DEFAULTS["groq"],
     ProviderType.OLLAMA: PROVIDER_DEFAULTS["ollama"],
     ProviderType.DEEPSEEK: DEEPSEEK_DEFAULT,
+    ProviderType.OPENROUTER: PROVIDER_DEFAULTS["openrouter"],
+    ProviderType.TOGETHER: PROVIDER_DEFAULTS["together"],
+    ProviderType.FIREWORKS: PROVIDER_DEFAULTS["fireworks"],
+    ProviderType.MISTRAL: PROVIDER_DEFAULTS["mistral"],
+    ProviderType.PERPLEXITY: PROVIDER_DEFAULTS["perplexity"],
+    ProviderType.XAI: PROVIDER_DEFAULTS["xai"],
 }
 
 

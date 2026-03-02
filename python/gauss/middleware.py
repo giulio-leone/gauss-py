@@ -45,6 +45,18 @@ class MiddlewareChain:
         middleware_use_caching(self._handle, ttl_ms)
         return self
 
+    def use_rate_limit(
+        self,
+        requests_per_minute: int,
+        burst: int | None = None,
+    ) -> MiddlewareChain:
+        """Add token-bucket rate limiting middleware. Returns self for chaining."""
+        from gauss._native import middleware_use_rate_limit
+
+        self._check_alive()
+        middleware_use_rate_limit(self._handle, requests_per_minute, burst)
+        return self
+
     @property
     def handle(self) -> int:
         """Return the native handle."""

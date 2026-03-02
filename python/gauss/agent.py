@@ -133,10 +133,12 @@ class Agent:
         self._config = config or AgentConfig(**kwargs)
         self._tools: list[ToolDef] = list(self._config.tools)
         self._destroyed = False
+        self._destroy_provider = destroy_provider
+        self._provider_handle: int | None = None
 
         provider_type, model, api_key = self._config.resolve()
 
-        self._provider_handle: int = create_provider(
+        self._provider_handle = create_provider(
             provider_type.value,
             model,
             api_key,
@@ -144,7 +146,6 @@ class Agent:
             self._config.max_retries,
         )
         self._model = model
-        self._destroy_provider = destroy_provider
 
     # ── Execution ──────────────────────────────────────────────────────
 
@@ -504,9 +505,9 @@ class Agent:
         Automatically invoked when the agent is used as a context manager
         or garbage-collected.
         """
-        if not self._destroyed:
+        if not self._destroyed and self._provider_handle is not None:
             self._destroy_provider(self._provider_handle)
-            self._destroyed = True
+        self._destroyed = True
 
     def __enter__(self) -> Agent:
         """Enter the context manager, returning this agent instance."""
@@ -522,7 +523,7 @@ class Agent:
     # ── Internal ──────────────────────────────────────────────────────
 
     def _check_alive(self) -> None:
-        if self._destroyed:
+        if self._destroyed or self._provider_handle is None:
             raise RuntimeError("Agent has been destroyed")
 
     def _build_options(self) -> dict[str, Any]:
@@ -604,7 +605,8 @@ class Agent:
     @property
     def handle(self) -> int:
         """Return the native provider handle for advanced / low-level use."""
-        return self._provider_handle
+        self._check_alive()
+        return int(self._provider_handle)
 
     @staticmethod
     def _normalize_messages(
@@ -643,3 +645,26 @@ def gauss(prompt: str, **kwargs: Any) -> str:
     """
     with Agent(AgentConfig(**kwargs)) as agent:
         return agent.run(prompt).text
+
+
+def enterprise_preset(config: AgentConfig | None = None, **kwargs: Any) -> Agent:
+    """Create an enterprise-ready Agent with production-safe defaults."""
+    cfg = config or AgentConfig(**kwargs)
+    for key, value in kwargs.items():
+        if hasattr(cfg, key):
+            setattr(cfg, key, value)
+
+    if isinstance(cfg.provider, str):
+        cfg.provider = ProviderType(cfg.provider.lower())
+
+    if not cfg.name or cfg.name == "gauss-agent":
+        cfg.name = "enterprise-agent"
+    cfg.max_retries = max(cfg.max_retries, 5)
+    if cfg.temperature is None:
+        cfg.temperature = 0.2
+    if not cfg.cache_control:
+        cfg.cache_control = True
+    if cfg.reasoning_effort is None:
+        cfg.reasoning_effort = "medium"
+
+    return Agent(cfg)

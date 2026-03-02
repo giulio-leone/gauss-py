@@ -25,11 +25,12 @@ from gauss._types import (
     AgentConfig,
     AgentResult,
     Citation,
+    CostEstimate,
     Message,
     ProviderType,
     ToolDef,
 )
-from gauss.agent import Agent, gauss
+from gauss.agent import Agent, enterprise_preset, gauss
 from gauss.models import (
     ANTHROPIC_DEFAULT,
     ANTHROPIC_FAST,
@@ -44,6 +45,11 @@ from gauss.models import (
     OPENAI_IMAGE,
     OPENAI_REASONING,
     OPENROUTER_DEFAULT,
+    TOGETHER_DEFAULT,
+    FIREWORKS_DEFAULT,
+    MISTRAL_DEFAULT,
+    PERPLEXITY_DEFAULT,
+    XAI_DEFAULT,
     PROVIDER_DEFAULTS,
     default_model,
 )
@@ -144,6 +150,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "count_tokens_for_model": ("gauss.tokens", "count_tokens_for_model"),
     "count_message_tokens": ("gauss.tokens", "count_message_tokens"),
     "get_context_window_size": ("gauss.tokens", "get_context_window_size"),
+    "estimate_cost": ("gauss.tokens", "estimate_cost"),
     # tool_validator
     "ToolValidator": ("gauss.tool_validator", "ToolValidator"),
     # vector_store
@@ -194,6 +201,7 @@ def __dir__() -> list[str]:
 __all__ = [
     # One-liner
     "gauss",
+    "enterprise_preset",
     "batch",
     "BatchItem",
     # Streaming
@@ -211,6 +219,11 @@ __all__ = [
     "GOOGLE_PREMIUM",
     "GOOGLE_IMAGE",
     "OPENROUTER_DEFAULT",
+    "TOGETHER_DEFAULT",
+    "FIREWORKS_DEFAULT",
+    "MISTRAL_DEFAULT",
+    "PERPLEXITY_DEFAULT",
+    "XAI_DEFAULT",
     "DEEPSEEK_DEFAULT",
     "DEEPSEEK_REASONING",
     "PROVIDER_DEFAULTS",
@@ -224,6 +237,7 @@ __all__ = [
     "AgentConfig",
     "AgentResult",
     "Citation",
+    "CostEstimate",
     "CodeExecutionOptions",
     "CodeExecutionResult",
     "GeneratedImageData",
@@ -280,6 +294,7 @@ __all__ = [
     "count_tokens_for_model",
     "count_message_tokens",
     "get_context_window_size",
+    "estimate_cost",
     "parse_partial_json",
     "parse_agent_config",
     "resolve_env",
