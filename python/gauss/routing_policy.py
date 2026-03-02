@@ -129,6 +129,30 @@ def resolve_routing_target(
     current_hour_utc: int | None = None,
     governance_tags: list[str] | None = None,
 ) -> tuple[ProviderType, str]:
+    selected_provider, selected_model, _selected_by = _resolve_routing_decision(
+        policy,
+        provider,
+        model,
+        available_providers=available_providers,
+        estimated_cost_usd=estimated_cost_usd,
+        current_requests_per_minute=current_requests_per_minute,
+        current_hour_utc=current_hour_utc,
+        governance_tags=governance_tags,
+    )
+    return selected_provider, selected_model
+
+
+def _resolve_routing_decision(
+    policy: RoutingPolicy | None,
+    provider: ProviderType,
+    model: str,
+    *,
+    available_providers: list[ProviderType] | None = None,
+    estimated_cost_usd: float | None = None,
+    current_requests_per_minute: int | None = None,
+    current_hour_utc: int | None = None,
+    governance_tags: list[str] | None = None,
+) -> tuple[ProviderType, str, str]:
     enforce_routing_time_window(policy, current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.UTC).hour)
     if estimated_cost_usd is not None:
         enforce_routing_cost_limit(policy, estimated_cost_usd)
@@ -136,27 +160,27 @@ def resolve_routing_target(
         enforce_routing_rate_limit(policy, current_requests_per_minute)
 
     if policy is None:
-        return provider, model
+        return provider, model, "direct"
     candidates = policy.aliases.get(model)
     if candidates:
         if not available_providers:
             selected = _select_weighted_candidate(policy, candidates)
             enforce_routing_governance(policy, selected.provider, governance_tags)
-            return selected.provider, selected.model
+            return selected.provider, selected.model, f"alias:{model}"
         available = set(available_providers)
         viable = [candidate for candidate in candidates if candidate.provider in available]
         if viable:
             selected = _select_weighted_candidate(policy, viable)
             enforce_routing_governance(policy, selected.provider, governance_tags)
-            return selected.provider, selected.model
+            return selected.provider, selected.model, f"alias:{model}"
 
     fallback = resolve_fallback_provider(policy, available_providers or [])
     if fallback is not None and fallback != provider:
         enforce_routing_governance(policy, fallback, governance_tags)
-        return fallback, model
+        return fallback, model, f"fallback:{fallback.value}"
 
     enforce_routing_governance(policy, provider, governance_tags)
-    return provider, model
+    return provider, model, "direct"
 
 
 def resolve_fallback_provider(
@@ -302,7 +326,7 @@ def explain_routing_target(
         checks.append({"check": "rate_limit", "status": "skipped", "detail": "no rpm provided"})
 
     try:
-        selected_provider, selected_model = resolve_routing_target(
+        selected_provider, selected_model, selected_by = _resolve_routing_decision(
             policy,
             provider,
             model,
@@ -313,11 +337,15 @@ def explain_routing_target(
             governance_tags=governance_tags,
         )
         checks.append({"check": "governance", "status": "passed", "detail": "accepted"})
-        checks.append({"check": "selection", "status": "passed", "detail": f"{selected_provider.value}/{selected_model}"})
+        checks.append({"check": "selection", "status": "passed", "detail": selected_by})
         return {
             "ok": True,
             "checks": checks,
-            "decision": {"provider": selected_provider.value, "model": selected_model},
+            "decision": {
+                "provider": selected_provider.value,
+                "model": selected_model,
+                "selected_by": selected_by,
+            },
         }
     except RoutingPolicyError as exc:
         message = str(exc)

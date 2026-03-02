@@ -232,7 +232,7 @@ explanation = explain_routing_target(
     current_hour_utc=11,
     governance_tags=["balanced"],
 )
-print(explanation)
+print(explanation["decision"]["selected_by"])  # "direct" | "alias:..." | "fallback:..."
 ```
 
 ### Unified Control Plane (M51 foundation)

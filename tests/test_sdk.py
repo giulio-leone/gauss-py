@@ -502,6 +502,7 @@ class TestAgent:
         )
         assert explained_ok["ok"] is True
         assert explained_ok["decision"]["provider"] == "openai"
+        assert explained_ok["decision"]["selected_by"] == "direct"
         assert any(check["check"] == "selection" and check["status"] == "passed" for check in explained_ok["checks"])
 
         explained_fail = explain_routing_target(

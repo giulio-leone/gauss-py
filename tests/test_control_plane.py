@@ -97,6 +97,7 @@ class TestControlPlane:
             explain = json.loads(resp.read().decode("utf-8"))
             assert explain["ok"] is True
             assert explain["decision"]["provider"] == "openai"
+            assert explain["decision"]["selected_by"] == "direct"
             assert any(item["check"] == "selection" and item["status"] == "passed" for item in explain["checks"])
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
