@@ -233,6 +233,24 @@ class Graph:
             "final_text": outputs[last_node_id]["text"] if last_node_id else "",
         }
 
+    @classmethod
+    def pipeline(cls, nodes: list[dict[str, Any]]) -> Graph:
+        """Quick graph builder — create a linear pipeline.
+
+        Example::
+
+            result = Graph.pipeline([
+                {"node_id": "research", "agent": researcher},
+                {"node_id": "write", "agent": writer},
+            ]).run("Explain quantum computing")
+        """
+        graph = cls()
+        for node in nodes:
+            graph.add_node(**node)
+        for i in range(len(nodes) - 1):
+            graph.add_edge(nodes[i]["node_id"], nodes[i + 1]["node_id"])
+        return graph
+
     def _check_alive(self) -> None:
         if self._destroyed:
             raise RuntimeError("Graph has been destroyed")

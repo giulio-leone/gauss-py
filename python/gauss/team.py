@@ -112,6 +112,36 @@ class Team:
     def __del__(self) -> None:
         self.destroy()
 
+    @classmethod
+    def quick(
+        cls,
+        name: str,
+        strategy: str,
+        agents: list[dict[str, str]],
+    ) -> Team:
+        """Quick team builder from role descriptions.
+
+        Example::
+
+            result = Team.quick("content-team", "sequential", [
+                {"name": "researcher", "instructions": "Research topics"},
+                {"name": "writer", "instructions": "Write summaries"}
+            ]).run("Explain quantum computing")
+        """
+        from gauss.agent import Agent
+
+        team = cls(name)
+        for spec in agents:
+            agent = Agent(
+                name=spec.get("name", "agent"),
+                provider=spec.get("provider"),
+                model=spec.get("model"),
+                system_prompt=spec.get("instructions"),
+            )
+            team.add(agent)
+        team.strategy(strategy)
+        return team
+
     def _check_alive(self) -> None:
         if self._destroyed:
             raise RuntimeError("Team has been destroyed")
