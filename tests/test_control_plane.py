@@ -75,12 +75,14 @@ class TestControlPlane:
             assert caps["supports_policy_explain"] is True
             assert caps["supports_policy_explain_batch"] is True
             assert caps["supports_policy_explain_traces"] is True
+            assert caps["supports_policy_explain_diff"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
             assert caps["policy_explain_path"] == "/api/ops/policy/explain"
             assert caps["policy_explain_batch_path"] == "/api/ops/policy/explain/batch"
             assert caps["policy_explain_simulate_path"] == "/api/ops/policy/explain/simulate"
             assert caps["policy_explain_trace_path"] == "/api/ops/policy/explain/traces"
+            assert caps["policy_explain_diff_path"] == "/api/ops/policy/explain/diff"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -132,12 +134,21 @@ class TestControlPlane:
             assert simulation["passed"] == 1
             assert simulation["failed"] == 1
 
+        with urllib.request.urlopen(f"{url}/api/ops/policy/explain/diff?scenarios={scenarios}") as resp:
+            diff = json.loads(resp.read().decode("utf-8"))
+            assert str(diff["trace_id"]).startswith("trace-")
+            assert diff["total"] == 2
+            assert diff["baseline_passed"] == 2
+            assert diff["candidate_passed"] == 1
+            assert diff["changed"] == 1
+
         with urllib.request.urlopen(f"{url}/api/ops/policy/explain/traces") as resp:
             traces = json.loads(resp.read().decode("utf-8"))
-            assert traces["total"] >= 3
+            assert traces["total"] >= 4
             assert any(item["mode"] == "single" for item in traces["traces"])
             assert any(item["mode"] == "batch" for item in traces["traces"])
             assert any(item["mode"] == "simulate" for item in traces["traces"])
+            assert any(item["mode"] == "diff" for item in traces["traces"])
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")

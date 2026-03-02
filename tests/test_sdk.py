@@ -514,6 +514,22 @@ class TestAgent:
         assert explained_fail["ok"] is False
         assert "routing policy rejected hour 22" in explained_fail["error"]
 
+    def test_evaluate_policy_gate(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.routing_policy import RoutingPolicy, evaluate_policy_gate
+
+        summary = evaluate_policy_gate(
+            RoutingPolicy(allowed_hours_utc=[9, 10, 11]),
+            [
+                {"provider": ProviderType.OPENAI, "model": "gpt-5.2", "options": {"current_hour_utc": 10}},
+                {"provider": ProviderType.OPENAI, "model": "gpt-5.2", "options": {"current_hour_utc": 22}},
+            ],
+        )
+        assert summary["total"] == 2
+        assert summary["passed"] == 1
+        assert summary["failed"] == 1
+        assert summary["failed_indexes"] == [1]
+
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
         from gauss.agent import Agent
@@ -545,6 +561,7 @@ class TestAgent:
             create_tool_executor,
             detect_provider,
             enterprise_run,
+            evaluate_policy_gate,
             get_pricing,
             resolve_api_key,
             set_pricing,
@@ -555,6 +572,7 @@ class TestAgent:
         assert callable(enterprise_run)
         assert callable(detect_provider)
         assert callable(resolve_api_key)
+        assert callable(evaluate_policy_gate)
         assert callable(create_resilient_agent)
         assert callable(tool)
         assert callable(create_tool_executor)

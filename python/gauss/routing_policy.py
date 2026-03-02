@@ -354,3 +354,34 @@ def explain_routing_target(
             checks.append({"check": "selection", "status": "skipped", "detail": "selection aborted"})
             return {"ok": False, "checks": checks, "error": message}
         return fail("selection", exc)
+
+
+def evaluate_policy_gate(
+    policy: RoutingPolicy | None,
+    scenarios: list[dict[str, Any]],
+) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    failed_indexes: list[int] = []
+    for index, scenario in enumerate(scenarios):
+        provider_raw = scenario.get("provider", ProviderType.OPENAI)
+        provider = (
+            provider_raw
+            if isinstance(provider_raw, ProviderType)
+            else ProviderType(str(provider_raw))
+        )
+        model = str(scenario.get("model", "gpt-5.2"))
+        options = scenario.get("options")
+        if options is not None and not isinstance(options, dict):
+            raise ValueError(f"scenario {index} options must be a dict")
+        explanation = explain_routing_target(policy, provider, model, **(options or {}))
+        results.append(explanation)
+        if not explanation.get("ok"):
+            failed_indexes.append(index)
+    failed = len(failed_indexes)
+    return {
+        "total": len(results),
+        "passed": len(results) - failed,
+        "failed": failed,
+        "failed_indexes": failed_indexes,
+        "results": results,
+    }

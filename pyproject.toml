@@ -33,6 +33,9 @@ Documentation = "https://github.com/giulio-leone/gauss-py#readme"
 dev = ["pytest", "pytest-asyncio", "hypothesis"]
 docs = ["pdoc"]
 
+[project.scripts]
+gauss-policy-gate = "gauss.policy_gate:main"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 manifest-path = "../gauss-core/crates/gauss-python/Cargo.toml"

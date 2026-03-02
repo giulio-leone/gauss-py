@@ -261,6 +261,11 @@ class ControlPlane:
                         self._send_json(payload)
                         return
 
+                    if parsed.path == "/api/ops/policy/explain/diff":
+                        payload = json.dumps(outer._ops_policy_explain_diff(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
                     if parsed.path == "/api/ops/policy/explain/traces":
                         payload = json.dumps(outer._ops_policy_explain_traces(params), indent=2).encode("utf-8")
                         self._send_json(payload)
@@ -624,6 +629,60 @@ class ControlPlane:
         trace = self._record_policy_explain_trace("simulate", response)
         return {**response, "trace_id": trace["trace_id"]}
 
+    def _ops_policy_explain_diff(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        from gauss.routing_policy import explain_routing_target
+
+        scenarios = self._parse_policy_explain_batch_scenarios(params)
+        results: list[dict[str, Any]] = []
+        for index, (provider, model, options) in enumerate(scenarios):
+            baseline = explain_routing_target(
+                None,
+                provider,
+                model,
+                available_providers=options["available_providers"],
+                estimated_cost_usd=options["estimated_cost_usd"],
+                current_requests_per_minute=options["current_requests_per_minute"],
+                current_hour_utc=options["current_hour_utc"],
+                governance_tags=options["governance_tags"],
+            )
+            candidate = explain_routing_target(
+                self._routing_policy,
+                provider,
+                model,
+                available_providers=options["available_providers"],
+                estimated_cost_usd=options["estimated_cost_usd"],
+                current_requests_per_minute=options["current_requests_per_minute"],
+                current_hour_utc=options["current_hour_utc"],
+                governance_tags=options["governance_tags"],
+            )
+            changed = (
+                baseline.get("ok") != candidate.get("ok")
+                or (baseline.get("decision") or {}).get("provider")
+                != (candidate.get("decision") or {}).get("provider")
+                or (baseline.get("decision") or {}).get("model")
+                != (candidate.get("decision") or {}).get("model")
+            )
+            results.append(
+                {
+                    "index": index,
+                    "input": {"provider": provider.value, "model": model},
+                    "baseline": baseline,
+                    "candidate": candidate,
+                    "changed": changed,
+                }
+            )
+
+        response = {
+            "ok": True,
+            "total": len(results),
+            "baseline_passed": sum(1 for item in results if item["baseline"].get("ok")),
+            "candidate_passed": sum(1 for item in results if item["candidate"].get("ok")),
+            "changed": sum(1 for item in results if item["changed"]),
+            "results": results,
+        }
+        trace = self._record_policy_explain_trace("diff", response)
+        return {**response, "trace_id": trace["trace_id"]}
+
     def _record_policy_explain_trace(self, mode: str, payload: dict[str, Any]) -> dict[str, Any]:
         trace = {
             "trace_id": f"trace-{self._next_explain_trace_id}",
@@ -867,12 +926,14 @@ class ControlPlane:
             "supports_policy_explain": True,
             "supports_policy_explain_batch": True,
             "supports_policy_explain_traces": True,
+            "supports_policy_explain_diff": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
             "policy_explain_path": "/api/ops/policy/explain",
             "policy_explain_batch_path": "/api/ops/policy/explain/batch",
             "policy_explain_simulate_path": "/api/ops/policy/explain/simulate",
             "policy_explain_trace_path": "/api/ops/policy/explain/traces",
+            "policy_explain_diff_path": "/api/ops/policy/explain/diff",
         }
 
     def _ops_health(self) -> dict[str, Any]:
