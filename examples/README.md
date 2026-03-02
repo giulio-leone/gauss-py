@@ -5,7 +5,7 @@ Runnable examples showcasing every major feature of the **gauss-py** SDK.
 ## Prerequisites
 
 ```bash
-pip install gauss
+pip install gauss-py
 ```
 
 Set at least one provider API key:
