@@ -87,6 +87,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "EvalRunner": ("gauss.eval", "EvalRunner"),
     # graph
     "Graph": ("gauss.graph", "Graph"),
+    "RouterFn": ("gauss.graph", "RouterFn"),
     # guardrail
     "GuardrailChain": ("gauss.guardrail", "GuardrailChain"),
     # mcp
@@ -263,6 +264,7 @@ __all__ = [
     "SearchResult",
     # Orchestration
     "Graph",
+    "RouterFn",
     "Workflow",
     "Network",
     "Team",

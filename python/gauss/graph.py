@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Callable
 
 from gauss._types import ToolDef
+
+
+# Type alias for router functions used in conditional edges.
+RouterFn = Callable[[dict[str, Any]], str]
 
 
 class Graph:
@@ -32,6 +36,11 @@ class Graph:
 
         self._handle: int = create_graph()
         self._destroyed = False
+
+        # SDK-level bookkeeping for conditional routing.
+        self._nodes: dict[str, dict[str, Any]] = {}
+        self._edges: dict[str, str] = {}
+        self._conditional_edges: dict[str, RouterFn] = {}
 
     def add_node(
         self,
@@ -69,6 +78,7 @@ class Graph:
             instructions,
             tools_json,
         )
+        self._nodes[node_id] = {"agent": agent, "instructions": instructions}
         return self
 
     def add_edge(self, from_node: str, to_node: str) -> Graph:
@@ -82,6 +92,21 @@ class Graph:
 
         self._check_alive()
         graph_add_edge(self._handle, from_node, to_node)
+        self._edges[from_node] = to_node
+        return self
+
+    def add_conditional_edge(self, from_node: str, router: RouterFn) -> Graph:
+        """Add a conditional edge — router decides the next node at runtime.
+
+        The router function receives the source node's output dict and must
+        return the ID of the next node to execute.
+
+        Args:
+            from_node: Source node ID.
+            router: Callable that maps a node result dict to the next node ID.
+        """
+        self._check_alive()
+        self._conditional_edges[from_node] = router
         return self
 
     def add_fork(
@@ -130,12 +155,17 @@ class Graph:
         Returns:
             A dict with ``outputs`` (per-node results) and ``final_text``.
         """
-        from gauss._native import graph_run
-        from gauss.agent import _run_native
-
         self._check_alive()
-        result_json = _run_native(graph_run, self._handle, prompt)
-        return json.loads(result_json)  # type: ignore[no-any-return]
+
+        # Fast path: no conditional edges → delegate to Rust core.
+        if not self._conditional_edges:
+            from gauss._native import graph_run
+            from gauss.agent import _run_native
+
+            result_json = _run_native(graph_run, self._handle, prompt)
+            return json.loads(result_json)  # type: ignore[no-any-return]
+
+        return self._run_with_conditionals(prompt)
 
     def destroy(self) -> None:
         """Release native resources."""
@@ -153,6 +183,55 @@ class Graph:
 
     def __del__(self) -> None:
         self.destroy()
+
+    # ── Private ─────────────────────────────────────────────────────
+
+    def _run_with_conditionals(self, prompt: str) -> dict[str, Any]:
+        """SDK-level step-through execution when conditional edges are present."""
+        # Determine entry node: a node with no incoming edges.
+        targets = set(self._edges.values())
+        entry_nodes = [n for n in self._nodes if n not in targets]
+        if not entry_nodes:
+            raise RuntimeError(
+                "Graph has no entry node (every node has an incoming edge)"
+            )
+
+        outputs: dict[str, dict[str, Any]] = {}
+        current_node: str | None = entry_nodes[0]
+        current_prompt = prompt
+
+        while current_node is not None:
+            node_cfg = self._nodes.get(current_node)
+            if node_cfg is None:
+                raise RuntimeError(f'Node "{current_node}" not found in graph')
+
+            agent = node_cfg["agent"]
+            instructions = node_cfg["instructions"]
+            agent_input = (
+                f"{instructions}\n\n{current_prompt}" if instructions else current_prompt
+            )
+
+            result = agent.run(agent_input)
+            node_output: dict[str, Any] = {"text": result.text}
+            outputs[current_node] = node_output
+
+            # Decide next node.
+            router = self._conditional_edges.get(current_node)
+            if router is not None:
+                current_node = router(node_output)
+            else:
+                current_node = self._edges.get(current_node)
+
+            # Feed previous output as prompt for the next node.
+            current_prompt = result.text
+
+        # Build result envelope matching graph_run shape.
+        node_ids = list(outputs.keys())
+        last_node_id = node_ids[-1] if node_ids else None
+        return {
+            "outputs": outputs,
+            "final_text": outputs[last_node_id]["text"] if last_node_id else "",
+        }
 
     def _check_alive(self) -> None:
         if self._destroyed:
