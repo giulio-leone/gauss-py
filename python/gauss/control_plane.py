@@ -9,7 +9,7 @@ import time
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import parse_qs, urlparse
 
 from gauss._types import ProviderType
@@ -79,6 +79,7 @@ class ControlPlane:
         self._next_explain_trace_id = 1
         self._explain_traces: list[dict[str, Any]] = []
         self._latest_explain_trace_id: str | None = None
+        self._policy_drift_alert_hooks: list[Callable[[dict[str, Any]], None]] = []
         self._next_policy_lifecycle_version = 1
         self._policy_lifecycle_versions: list[dict[str, Any]] = []
         self._active_policy_version_id: str | None = None
@@ -104,6 +105,10 @@ class ControlPlane:
     def with_context(self, context: dict[str, str]) -> "ControlPlane":
         self._assert_context_allowed(context)
         self._context = dict(context)
+        return self
+
+    def on_policy_drift_alert(self, hook: Callable[[dict[str, Any]], None]) -> "ControlPlane":
+        self._policy_drift_alert_hooks.append(hook)
         return self
 
     def set_cost_usage(
@@ -297,6 +302,11 @@ class ControlPlane:
 
                     if parsed.path == "/api/ops/policy/lifecycle/versions":
                         payload = json.dumps(outer._ops_policy_lifecycle_versions(), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/drift":
+                        payload = json.dumps(outer._ops_policy_drift(params), indent=2).encode("utf-8")
                         self._send_json(payload)
                         return
 
@@ -754,6 +764,25 @@ class ControlPlane:
             governance=governance,
         )
 
+    def _parse_optional_policy_from_query(self, params: dict[str, list[str]], key: str) -> "RoutingPolicy | None":
+        raw = params.get(key, [None])[0]
+        if raw is None or raw == "":
+            return None
+        return self._parse_policy_lifecycle_policy({"policy": [raw]})
+
+    def _parse_policy_drift_guardrails(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        max_changed = self._parse_optional_int(params, "maxChanged", field="maxChanged")
+        max_regressions = self._parse_optional_int(params, "maxRegressions", field="maxRegressions")
+        min_candidate_pass_rate = self._parse_optional_float(params, "minCandidatePassRate", field="minCandidatePassRate")
+        out: dict[str, Any] = {}
+        if max_changed is not None:
+            out["max_changed"] = max_changed
+        if max_regressions is not None:
+            out["max_regressions"] = max_regressions
+        if min_candidate_pass_rate is not None:
+            out["min_candidate_pass_rate"] = min_candidate_pass_rate
+        return out
+
     def _summarize_policy_lifecycle_version(self, version: dict[str, Any]) -> dict[str, Any]:
         return {
             "version_id": version["version_id"],
@@ -958,6 +987,53 @@ class ControlPlane:
             "results": diff["results"],
         }
         trace = self._record_policy_explain_trace("diff", response)
+        return {**response, "trace_id": trace["trace_id"]}
+
+    def _ops_policy_drift(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        from gauss.routing_policy import evaluate_policy_diff, evaluate_policy_rollout_guardrails
+
+        scenarios = self._parse_policy_explain_batch_scenarios(params)
+        baseline_version_id = params.get("baselineVersion", [None])[0]
+        candidate_version_id = params.get("candidateVersion", [None])[0]
+
+        baseline_from_version = (
+            deepcopy(self._find_policy_lifecycle_version(baseline_version_id)["policy"])
+            if baseline_version_id
+            else deepcopy(self._find_policy_lifecycle_version(self._active_policy_version_id)["policy"])
+            if self._active_policy_version_id
+            else None
+        )
+        candidate_from_version = (
+            deepcopy(self._find_policy_lifecycle_version(candidate_version_id)["policy"])
+            if candidate_version_id
+            else None
+        )
+        baseline_policy = self._parse_optional_policy_from_query(params, "baselinePolicy") or baseline_from_version
+        candidate_policy = (
+            self._parse_optional_policy_from_query(params, "candidatePolicy")
+            or candidate_from_version
+            or self._routing_policy
+        )
+
+        scenario_payload = [
+            {"provider": provider, "model": model, "options": options}
+            for provider, model, options in scenarios
+        ]
+        diff = evaluate_policy_diff(candidate_policy, scenario_payload, baseline_policy)
+        guardrails = evaluate_policy_rollout_guardrails(diff, self._parse_policy_drift_guardrails(params))
+        response = {
+            "ok": bool(guardrails.get("ok")),
+            "alert": not bool(guardrails.get("ok")),
+            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "baseline_version_id": baseline_version_id or self._active_policy_version_id,
+            "candidate_version_id": candidate_version_id,
+            "diff": diff,
+            "guardrails": guardrails,
+        }
+        if response["alert"]:
+            for hook in self._policy_drift_alert_hooks:
+                hook(response)
+        trace = self._record_policy_explain_trace("drift", response)
         return {**response, "trace_id": trace["trace_id"]}
 
     def _record_policy_explain_trace(self, mode: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1205,6 +1281,7 @@ class ControlPlane:
             "supports_policy_explain_traces": True,
             "supports_policy_explain_diff": True,
             "supports_policy_lifecycle": True,
+            "supports_policy_drift_monitoring": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
             "policy_explain_path": "/api/ops/policy/explain",
@@ -1213,6 +1290,7 @@ class ControlPlane:
             "policy_explain_trace_path": "/api/ops/policy/explain/traces",
             "policy_explain_diff_path": "/api/ops/policy/explain/diff",
             "policy_lifecycle_base_path": "/api/ops/policy/lifecycle",
+            "policy_drift_path": "/api/ops/policy/drift",
         }
 
     def _ops_health(self) -> dict[str, Any]:

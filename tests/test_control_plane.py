@@ -77,6 +77,7 @@ class TestControlPlane:
             assert caps["supports_policy_explain_traces"] is True
             assert caps["supports_policy_explain_diff"] is True
             assert caps["supports_policy_lifecycle"] is True
+            assert caps["supports_policy_drift_monitoring"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
             assert caps["policy_explain_path"] == "/api/ops/policy/explain"
@@ -85,6 +86,7 @@ class TestControlPlane:
             assert caps["policy_explain_trace_path"] == "/api/ops/policy/explain/traces"
             assert caps["policy_explain_diff_path"] == "/api/ops/policy/explain/diff"
             assert caps["policy_lifecycle_base_path"] == "/api/ops/policy/lifecycle"
+            assert caps["policy_drift_path"] == "/api/ops/policy/drift"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -194,6 +196,27 @@ class TestControlPlane:
             assert versions["ok"] is True
             assert versions["active_version_id"] == version_id
             assert any(item["version_id"] == version_id for item in versions["versions"])
+
+        drift_alerts: list[dict[str, object]] = []
+        cp.on_policy_drift_alert(lambda alert: drift_alerts.append(alert))
+        drift_scenarios = urllib.parse.quote(
+            json.dumps([{"provider": "openai", "model": "gpt-5.2", "hour": 10, "tags": ["rollout"]}])
+        )
+        drift_candidate = urllib.parse.quote(
+            json.dumps({"allowed_hours_utc": [22], "governance": {"rules": [{"type": "require_tag", "tag": "rollout"}]}})
+        )
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/drift?scenarios={drift_scenarios}&candidatePolicy={drift_candidate}&maxRegressions=0"
+        ) as resp:
+            drift = json.loads(resp.read().decode("utf-8"))
+            assert drift["trace_id"].startswith("trace-")
+            assert drift["ok"] is False
+            assert drift["alert"] is True
+            assert drift["diff"]["regressions"] == 1
+            assert drift["guardrails"]["ok"] is False
+        assert len(drift_alerts) == 1
+        assert drift_alerts[0]["alert"] is True
+        assert drift_alerts[0]["diff"]["regressions"] == 1
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")
