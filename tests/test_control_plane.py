@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+import urllib.error
 import urllib.request
 
 from gauss.control_plane import ControlPlane
@@ -52,3 +55,57 @@ class TestControlPlane:
 
         cp.stop_server()
 
+    def test_auth_token_protects_api(self):
+        cp = ControlPlane(auth_token="secret-token")
+        url = cp.start_server(port=0)
+
+        try:
+            urllib.request.urlopen(f"{url}/api/snapshot")
+            assert False, "Expected unauthorized"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 401
+
+        with urllib.request.urlopen(f"{url}/api/snapshot?token=secret-token") as resp:
+            assert resp.status == 200
+
+        cp.stop_server()
+
+    def test_filters_history_timeline_dag_and_persistence(self):
+        persist_path = os.path.join(tempfile.gettempdir(), f"gauss-cp-{os.getpid()}.jsonl")
+        if os.path.exists(persist_path):
+            os.remove(persist_path)
+
+        set_pricing("cp-test-model", ModelPricing(input_per_token=0.001, output_per_token=0.001))
+        cp = ControlPlane(
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+            model="cp-test-model",
+            persist_path=persist_path,
+        )
+        cp.set_cost_usage(2, 3)
+        url = cp.start_server(port=0)
+
+        with urllib.request.urlopen(f"{url}/api/snapshot?section=metrics") as resp:
+            metrics_only = json.loads(resp.read().decode("utf-8"))
+            assert metrics_only["metrics"]["total_spans"] == 1
+
+        with urllib.request.urlopen(f"{url}/api/history") as resp:
+            history = json.loads(resp.read().decode("utf-8"))
+            assert len(history) >= 1
+
+        with urllib.request.urlopen(f"{url}/api/timeline") as resp:
+            timeline = json.loads(resp.read().decode("utf-8"))
+            assert timeline[-1]["span_count"] == 1
+            assert timeline[-1]["pending_approvals_count"] == 1
+
+        with urllib.request.urlopen(f"{url}/api/dag") as resp:
+            dag = json.loads(resp.read().decode("utf-8"))
+            assert len(dag["nodes"]) == 1
+
+        cp.stop_server()
+        clear_pricing()
+        assert os.path.exists(persist_path)
+        with open(persist_path, "r", encoding="utf-8") as f:
+            lines = [line for line in f.read().splitlines() if line.strip()]
+            assert len(lines) >= 1
+        os.remove(persist_path)
