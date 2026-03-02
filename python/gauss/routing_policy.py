@@ -16,11 +16,24 @@ class RoutingCandidate:
 
 
 @dataclass
+class GovernanceRule:
+    type: str
+    tag: str | None = None
+    provider: ProviderType | None = None
+
+
+@dataclass
+class GovernancePolicyPack:
+    rules: list[GovernanceRule] = field(default_factory=list)
+
+
+@dataclass
 class RoutingPolicy:
     aliases: dict[str, list[RoutingCandidate]] = field(default_factory=dict)
     fallback_order: list[ProviderType] = field(default_factory=list)
     max_total_cost_usd: float | None = None
     max_requests_per_minute: int | None = None
+    governance: GovernancePolicyPack | None = None
 
 
 class RoutingPolicyError(ValueError):
@@ -35,6 +48,7 @@ def resolve_routing_target(
     available_providers: list[ProviderType] | None = None,
     estimated_cost_usd: float | None = None,
     current_requests_per_minute: int | None = None,
+    governance_tags: list[str] | None = None,
 ) -> tuple[ProviderType, str]:
     if estimated_cost_usd is not None:
         enforce_routing_cost_limit(policy, estimated_cost_usd)
@@ -47,17 +61,21 @@ def resolve_routing_target(
     if candidates:
         if not available_providers:
             selected = max(candidates, key=lambda c: c.priority)
+            enforce_routing_governance(policy, selected.provider, governance_tags)
             return selected.provider, selected.model
         available = set(available_providers)
         viable = [candidate for candidate in candidates if candidate.provider in available]
         if viable:
             selected = max(viable, key=lambda c: c.priority)
+            enforce_routing_governance(policy, selected.provider, governance_tags)
             return selected.provider, selected.model
 
     fallback = resolve_fallback_provider(policy, available_providers or [])
     if fallback is not None and fallback != provider:
+        enforce_routing_governance(policy, fallback, governance_tags)
         return fallback, model
 
+    enforce_routing_governance(policy, provider, governance_tags)
     return provider, model
 
 
@@ -92,3 +110,32 @@ def enforce_routing_rate_limit(
         return
     if requests_per_minute > policy.max_requests_per_minute:
         raise RoutingPolicyError(f"routing policy rejected rate {requests_per_minute}")
+
+
+def enforce_routing_governance(
+    policy: RoutingPolicy | None,
+    provider: ProviderType,
+    governance_tags: list[str] | None,
+) -> None:
+    if policy is None or policy.governance is None:
+        return
+
+    rules = policy.governance.rules
+    allow_providers = [
+        rule.provider
+        for rule in rules
+        if rule.type == "allow_provider" and rule.provider is not None
+    ]
+    if allow_providers and provider not in allow_providers:
+        raise RoutingPolicyError(f"routing policy governance rejected provider {provider.value}")
+
+    for rule in rules:
+        if rule.type == "deny_provider" and rule.provider == provider:
+            raise RoutingPolicyError(f"routing policy governance rejected provider {provider.value}")
+        if (
+            rule.type == "require_tag"
+            and governance_tags is not None
+            and rule.tag is not None
+            and rule.tag not in governance_tags
+        ):
+            raise RoutingPolicyError(f"routing policy governance missing tag {rule.tag}")

@@ -748,6 +748,7 @@ class Agent:
         available_providers: list[ProviderType] | None = None,
         estimated_cost_usd: float | None = None,
         current_requests_per_minute: int | None = None,
+        governance_tags: list[str] | None = None,
     ) -> Agent:
         """Clone this agent after applying runtime policy-router context.
 
@@ -755,6 +756,7 @@ class Agent:
             available_providers: Providers currently healthy/available.
             estimated_cost_usd: Estimated cost for the next request.
             current_requests_per_minute: Current request rate for throttling checks.
+            governance_tags: Governance/compliance tags required by routing policy DSL.
 
         Returns:
             A new :class:`Agent` instance resolved through routing policy + runtime context.
@@ -770,6 +772,7 @@ class Agent:
             available_providers=available_providers,
             estimated_cost_usd=estimated_cost_usd,
             current_requests_per_minute=current_requests_per_minute,
+            governance_tags=governance_tags,
         )
         config = replace(
             self._config,

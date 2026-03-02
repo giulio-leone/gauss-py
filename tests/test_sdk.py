@@ -355,11 +355,15 @@ class TestAgent:
 
     def test_routing_policy_cost_limit_helper(self) -> None:
         from gauss.routing_policy import (
+            resolve_routing_target,
             RoutingPolicy,
             RoutingPolicyError,
             enforce_routing_cost_limit,
+            enforce_routing_governance,
             enforce_routing_rate_limit,
         )
+        from gauss.routing_policy import GovernancePolicyPack, GovernanceRule
+        from gauss._types import ProviderType
 
         policy = RoutingPolicy(max_total_cost_usd=1.0)
         enforce_routing_cost_limit(policy, 0.5)
@@ -370,6 +374,36 @@ class TestAgent:
         enforce_routing_rate_limit(policy, 10)
         with pytest.raises(RoutingPolicyError, match="routing policy rejected rate 11"):
             enforce_routing_rate_limit(policy, 11)
+
+        governance = RoutingPolicy(
+            governance=GovernancePolicyPack(
+                rules=[
+                    GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                    GovernanceRule(type="require_tag", tag="pci"),
+                ]
+            )
+        )
+        enforce_routing_governance(governance, ProviderType.OPENAI, ["pci"])
+        with pytest.raises(
+            RoutingPolicyError,
+            match="routing policy governance rejected provider anthropic",
+        ):
+            enforce_routing_governance(governance, ProviderType.ANTHROPIC, ["pci"])
+        with pytest.raises(
+            RoutingPolicyError,
+            match="routing policy governance missing tag pci",
+        ):
+            enforce_routing_governance(governance, ProviderType.OPENAI, [])
+        with pytest.raises(
+            RoutingPolicyError,
+            match="routing policy governance missing tag pci",
+        ):
+            resolve_routing_target(
+                governance,
+                ProviderType.OPENAI,
+                "gpt-5.2",
+                governance_tags=[],
+            )
 
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult

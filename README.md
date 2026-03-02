@@ -151,7 +151,13 @@ agent = Agent.from_env(system_prompt="Be precise.")
 fast_agent = agent.with_model("gpt-4.1")
 
 # Optional routing policy: alias + provider/model target
-from gauss import ProviderType, RoutingPolicy, RoutingCandidate
+from gauss import (
+    GovernancePolicyPack,
+    GovernanceRule,
+    ProviderType,
+    RoutingPolicy,
+    RoutingCandidate,
+)
 
 routed_agent = Agent(
     model="fast-chat",
@@ -168,14 +174,21 @@ routed_agent = Agent(
         fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI],
         max_total_cost_usd=2.0,
         max_requests_per_minute=60,
+        governance=GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                GovernanceRule(type="require_tag", tag="pci"),
+            ]
+        ),
     ),
 )
 
-# Runtime policy-router decision (availability + budget + rate)
+# Runtime policy-router decision (availability + budget + rate + governance tags)
 runtime_routed = routed_agent.with_routing_context(
     available_providers=[ProviderType.OPENAI],
     estimated_cost_usd=1.2,
     current_requests_per_minute=20,
+    governance_tags=["pci"],
 )
 ```
 
