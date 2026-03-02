@@ -63,6 +63,7 @@ class TestControlPlane:
             approvals=_DummyApprovals(),
             routing_policy=RoutingPolicy(fallback_order=["openai"], allowed_hours_utc=[9, 10, 11]),
         )
+        cp.register_policy_drift_sink("webhook://ops-audit")
         cp.with_context({"tenant_id": "t-1", "session_id": "s-1", "run_id": "r-1"}).snapshot()
         cp.with_context({"tenant_id": "t-2", "session_id": "s-2", "run_id": "r-2"}).snapshot()
         url = cp.start_server(port=0)
@@ -79,6 +80,9 @@ class TestControlPlane:
             assert caps["supports_policy_lifecycle"] is True
             assert caps["supports_policy_lifecycle_rbac"] is True
             assert caps["supports_policy_drift_monitoring"] is True
+            assert caps["supports_policy_drift_scheduler"] is True
+            assert caps["supports_policy_drift_windows"] is True
+            assert caps["supports_policy_drift_alert_sinks"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
             assert caps["policy_explain_path"] == "/api/ops/policy/explain"
@@ -90,6 +94,8 @@ class TestControlPlane:
             assert caps["policy_lifecycle_role_param"] == "role"
             assert "approved_by_role" in caps["policy_lifecycle_audit_fields"]
             assert caps["policy_drift_path"] == "/api/ops/policy/drift"
+            assert caps["policy_drift_schedule_path"] == "/api/ops/policy/drift/schedule"
+            assert caps["policy_drift_schedule_run_path"] == "/api/ops/policy/drift/schedule/run"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -215,11 +221,29 @@ class TestControlPlane:
             assert drift["trace_id"].startswith("trace-")
             assert drift["ok"] is False
             assert drift["alert"] is True
+            assert drift["window"] == "custom"
             assert drift["diff"]["regressions"] == 1
             assert drift["guardrails"]["ok"] is False
+            assert "webhook://ops-audit" in drift["sinks_triggered"]
         assert len(drift_alerts) == 1
         assert drift_alerts[0]["alert"] is True
         assert drift_alerts[0]["diff"]["regressions"] == 1
+
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/drift/schedule/set?scenarios={drift_scenarios}&candidatePolicy={drift_candidate}&window=last_1h&intervalMs=30000&maxRegressions=0"
+        ) as resp:
+            schedule = json.loads(resp.read().decode("utf-8"))
+            assert schedule["ok"] is True
+            assert schedule["schedule"]["window"] == "last_1h"
+            assert schedule["schedule"]["interval_ms"] == 30000
+            assert schedule["schedule"]["guardrails"]["max_regressions"] == 0
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/drift/schedule/run") as resp:
+            run = json.loads(resp.read().decode("utf-8"))
+            assert run["run_id"].startswith("drift-run-")
+            assert run["trace_id"].startswith("trace-")
+            assert run["window"] == "last_1h"
+            assert run["alert"] is True
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")

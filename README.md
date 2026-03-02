@@ -255,7 +255,11 @@ print(explanation["decision"]["selected_by"])  # "direct" | "alias:..." | "fallb
 # GET /api/ops/policy/lifecycle/promote?version=policy-v1&role=promoter|operator|admin
 # GET /api/ops/policy/lifecycle/versions
 # Policy drift monitoring:
-# GET /api/ops/policy/drift?scenarios=<json>&candidatePolicy=<json>&maxRegressions=0
+# cp.register_policy_drift_sink("webhook://ops-audit")
+# GET /api/ops/policy/drift?scenarios=<json>&candidatePolicy=<json>&window=last_24h&maxRegressions=0
+# GET /api/ops/policy/drift/schedule/set?scenarios=<json>&candidatePolicy=<json>&window=last_1h&intervalMs=60000
+# GET /api/ops/policy/drift/schedule
+# GET /api/ops/policy/drift/schedule/run
 ```
 
 ### Unified Control Plane (M51 foundation)

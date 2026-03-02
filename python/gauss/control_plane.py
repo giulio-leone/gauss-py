@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 _SECTION_KEYS = {"spans", "metrics", "pending_approvals", "latest_cost"}
 _STREAM_CHANNELS = {"snapshot", "timeline", "dag"}
+_POLICY_DRIFT_WINDOWS = {"custom", "last_1h", "last_24h", "last_7d"}
 _PROVIDERS = {
     "openai",
     "anthropic",
@@ -80,6 +81,10 @@ class ControlPlane:
         self._explain_traces: list[dict[str, Any]] = []
         self._latest_explain_trace_id: str | None = None
         self._policy_drift_alert_hooks: list[Callable[[dict[str, Any]], None]] = []
+        self._policy_drift_sinks: list[str] = []
+        self._policy_drift_schedule_config: dict[str, Any] | None = None
+        self._policy_drift_runs: list[dict[str, Any]] = []
+        self._next_policy_drift_run_id = 1
         self._next_policy_lifecycle_version = 1
         self._policy_lifecycle_versions: list[dict[str, Any]] = []
         self._active_policy_version_id: str | None = None
@@ -109,6 +114,14 @@ class ControlPlane:
 
     def on_policy_drift_alert(self, hook: Callable[[dict[str, Any]], None]) -> "ControlPlane":
         self._policy_drift_alert_hooks.append(hook)
+        return self
+
+    def register_policy_drift_sink(self, sink_id: str) -> "ControlPlane":
+        normalized = str(sink_id).strip()
+        if not normalized:
+            raise ValidationError("sink_id must be a non-empty string", "sink_id")
+        if normalized not in self._policy_drift_sinks:
+            self._policy_drift_sinks.append(normalized)
         return self
 
     def set_cost_usage(
@@ -302,6 +315,21 @@ class ControlPlane:
 
                     if parsed.path == "/api/ops/policy/lifecycle/versions":
                         payload = json.dumps(outer._ops_policy_lifecycle_versions(), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/drift/schedule/set":
+                        payload = json.dumps(outer._ops_policy_drift_schedule_set(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/drift/schedule/run":
+                        payload = json.dumps(outer._ops_policy_drift_schedule_run(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/drift/schedule":
+                        payload = json.dumps(outer._ops_policy_drift_schedule(), indent=2).encode("utf-8")
                         self._send_json(payload)
                         return
 
@@ -783,6 +811,12 @@ class ControlPlane:
             out["min_candidate_pass_rate"] = min_candidate_pass_rate
         return out
 
+    def _parse_policy_drift_window(self, params: dict[str, list[str]]) -> str:
+        raw = str(params.get("window", ["custom"])[0] or "custom").strip().lower()
+        if raw in _POLICY_DRIFT_WINDOWS:
+            return raw
+        raise ValidationError(f'Invalid policy drift window "{raw}"', "window")
+
     def _summarize_policy_lifecycle_version(self, version: dict[str, Any]) -> dict[str, Any]:
         return {
             "version_id": version["version_id"],
@@ -1076,10 +1110,99 @@ class ControlPlane:
         trace = self._record_policy_explain_trace("diff", response)
         return {**response, "trace_id": trace["trace_id"]}
 
+    def _ops_policy_drift_schedule_set(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        scenarios_raw = params.get("scenarios", [None])[0]
+        if not scenarios_raw:
+            raise ValidationError("Missing scenarios query parameter", "scenarios")
+        self._parse_policy_explain_batch_scenarios(params)
+        interval_ms = self._parse_optional_int(params, "intervalMs", field="intervalMs")
+        interval_ms = interval_ms if interval_ms is not None else 60_000
+        if interval_ms <= 0:
+            raise ValidationError("intervalMs must be > 0", "intervalMs")
+        now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        self._policy_drift_schedule_config = {
+            "enabled": True,
+            "interval_ms": interval_ms,
+            "window": self._parse_policy_drift_window(params),
+            "scenarios_raw": scenarios_raw,
+            "baseline_policy_raw": params.get("baselinePolicy", [None])[0] or None,
+            "candidate_policy_raw": params.get("candidatePolicy", [None])[0] or None,
+            "baseline_version_id": params.get("baselineVersion", [None])[0] or None,
+            "candidate_version_id": params.get("candidateVersion", [None])[0] or None,
+            "guardrails": self._parse_policy_drift_guardrails(params),
+            "updated_at": now,
+            "last_run_at": self._policy_drift_schedule_config.get("last_run_at")
+            if self._policy_drift_schedule_config
+            else None,
+        }
+        return {"ok": True, "schedule": self._summarize_policy_drift_schedule(self._policy_drift_schedule_config)}
+
+    def _summarize_policy_drift_schedule(self, schedule: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "enabled": bool(schedule.get("enabled")),
+            "interval_ms": schedule.get("interval_ms"),
+            "window": schedule.get("window"),
+            "updated_at": schedule.get("updated_at"),
+            "last_run_at": schedule.get("last_run_at"),
+            "baseline_version_id": schedule.get("baseline_version_id"),
+            "candidate_version_id": schedule.get("candidate_version_id"),
+            "has_baseline_policy": bool(schedule.get("baseline_policy_raw")),
+            "has_candidate_policy": bool(schedule.get("candidate_policy_raw")),
+            "guardrails": schedule.get("guardrails") or {},
+        }
+
+    def _ops_policy_drift_schedule(self) -> dict[str, Any]:
+        if self._policy_drift_schedule_config is None:
+            return {"ok": True, "schedule": None, "runs": list(self._policy_drift_runs)}
+        return {
+            "ok": True,
+            "schedule": self._summarize_policy_drift_schedule(self._policy_drift_schedule_config),
+            "runs": list(self._policy_drift_runs),
+        }
+
+    def _ops_policy_drift_schedule_run(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        run_params = {key: list(values) for key, values in params.items()}
+        if not str(run_params.get("scenarios", [None])[0] or "").strip():
+            if self._policy_drift_schedule_config is None:
+                raise ValidationError("Missing scenarios query parameter", "scenarios")
+            run_params["scenarios"] = [self._policy_drift_schedule_config["scenarios_raw"]]
+            run_params.setdefault("window", [self._policy_drift_schedule_config["window"]])
+            if self._policy_drift_schedule_config.get("baseline_version_id"):
+                run_params.setdefault("baselineVersion", [self._policy_drift_schedule_config["baseline_version_id"]])
+            if self._policy_drift_schedule_config.get("candidate_version_id"):
+                run_params.setdefault("candidateVersion", [self._policy_drift_schedule_config["candidate_version_id"]])
+            if self._policy_drift_schedule_config.get("baseline_policy_raw"):
+                run_params.setdefault("baselinePolicy", [self._policy_drift_schedule_config["baseline_policy_raw"]])
+            if self._policy_drift_schedule_config.get("candidate_policy_raw"):
+                run_params.setdefault("candidatePolicy", [self._policy_drift_schedule_config["candidate_policy_raw"]])
+            guardrails = self._policy_drift_schedule_config.get("guardrails") or {}
+            if guardrails.get("max_changed") is not None:
+                run_params.setdefault("maxChanged", [str(guardrails["max_changed"])])
+            if guardrails.get("max_regressions") is not None:
+                run_params.setdefault("maxRegressions", [str(guardrails["max_regressions"])])
+            if guardrails.get("min_candidate_pass_rate") is not None:
+                run_params.setdefault("minCandidatePassRate", [str(guardrails["min_candidate_pass_rate"])])
+
+        drift = self._ops_policy_drift(run_params)
+        run = {
+            **drift,
+            "run_id": f"drift-run-{self._next_policy_drift_run_id}",
+        }
+        self._next_policy_drift_run_id += 1
+        self._policy_drift_runs.append(run)
+        if len(self._policy_drift_runs) > self._history_limit:
+            self._policy_drift_runs.pop(0)
+        if self._policy_drift_schedule_config is not None:
+            now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+            self._policy_drift_schedule_config["last_run_at"] = run["generated_at"]
+            self._policy_drift_schedule_config["updated_at"] = now
+        return run
+
     def _ops_policy_drift(self, params: dict[str, list[str]]) -> dict[str, Any]:
         from gauss.routing_policy import evaluate_policy_diff, evaluate_policy_rollout_guardrails
 
         scenarios = self._parse_policy_explain_batch_scenarios(params)
+        window = self._parse_policy_drift_window(params)
         baseline_version_id = params.get("baselineVersion", [None])[0]
         candidate_version_id = params.get("candidateVersion", [None])[0]
 
@@ -1112,10 +1235,12 @@ class ControlPlane:
             "ok": bool(guardrails.get("ok")),
             "alert": not bool(guardrails.get("ok")),
             "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "window": window,
             "baseline_version_id": baseline_version_id or self._active_policy_version_id,
             "candidate_version_id": candidate_version_id,
             "diff": diff,
             "guardrails": guardrails,
+            "sinks_triggered": list(self._policy_drift_sinks) if not bool(guardrails.get("ok")) else [],
         }
         if response["alert"]:
             for hook in self._policy_drift_alert_hooks:
@@ -1370,6 +1495,9 @@ class ControlPlane:
             "supports_policy_lifecycle": True,
             "supports_policy_lifecycle_rbac": True,
             "supports_policy_drift_monitoring": True,
+            "supports_policy_drift_scheduler": True,
+            "supports_policy_drift_windows": True,
+            "supports_policy_drift_alert_sinks": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
             "policy_explain_path": "/api/ops/policy/explain",
@@ -1386,6 +1514,8 @@ class ControlPlane:
                 "promoted_by_role",
             ],
             "policy_drift_path": "/api/ops/policy/drift",
+            "policy_drift_schedule_path": "/api/ops/policy/drift/schedule",
+            "policy_drift_schedule_run_path": "/api/ops/policy/drift/schedule/run",
         }
 
     def _ops_health(self) -> dict[str, Any]:
