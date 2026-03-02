@@ -154,6 +154,18 @@ async def reduce_async(
     return result
 
 
+async def tap_async(
+    items: Sequence[T],
+    fn: Callable[[T, int], Awaitable[None] | None],
+) -> list[T]:
+    """Execute a side-effect for each item (sequential), returning items unchanged."""
+    for idx, item in enumerate(items):
+        maybe_awaitable = fn(item, idx)
+        if asyncio.iscoroutine(maybe_awaitable) or asyncio.isfuture(maybe_awaitable):
+            await maybe_awaitable
+    return list(items)
+
+
 def reduce_sync(
     items: Sequence[T],
     reducer: Callable[[R, T], R],

@@ -108,6 +108,7 @@ _mock_native.create_tool_validator.return_value = 110
 _mock_native.tool_validator_validate.return_value = json.dumps({"valid": True})
 _mock_native.destroy_tool_validator.return_value = None
 _mock_native.py_parse_partial_json.return_value = json.dumps({"partial": True})
+_mock_native.version.return_value = "2.0.0-test"
 
 # Team
 _mock_native.create_team.return_value = 200
@@ -198,6 +199,12 @@ class TestAgent:
     def test_gauss_one_liner(self) -> None:
         from gauss.agent import gauss
         answer = gauss("What is life?")
+        assert answer == "The answer is 42"
+
+    def test_enterprise_run_one_liner(self) -> None:
+        from gauss.agent import enterprise_run
+
+        answer = enterprise_run("What is life?")
         assert answer == "The answer is 42"
 
     def test_from_env_helper(self) -> None:
@@ -422,6 +429,44 @@ class TestAgent:
         assert text == "Hello World"
         assert chunks == ["Hello", " World"]
         agent.destroy()
+
+    def test_top_level_parity_exports(self) -> None:
+        from gauss import (
+            McpClient,
+            McpClientConfig,
+            McpToolResult,
+            ModelPricing,
+            ProviderType,
+            TypedToolDef,
+            clear_pricing,
+            create_resilient_agent,
+            create_tool_executor,
+            detect_provider,
+            enterprise_run,
+            get_pricing,
+            resolve_api_key,
+            set_pricing,
+            tool,
+            version,
+        )
+
+        assert callable(enterprise_run)
+        assert callable(detect_provider)
+        assert callable(resolve_api_key)
+        assert callable(create_resilient_agent)
+        assert callable(tool)
+        assert callable(create_tool_executor)
+        assert callable(set_pricing)
+        assert callable(get_pricing)
+        assert callable(clear_pricing)
+        assert version() == "2.0.0-test"
+        assert detect_provider() == ProviderType.OPENAI
+        assert resolve_api_key(ProviderType.OPENAI) == "sk-test-key"
+        assert TypedToolDef is not None
+        assert McpClient is not None
+        assert McpClientConfig is not None
+        assert McpToolResult is not None
+        assert ModelPricing is not None
 
 
 # ===========================================================================
@@ -777,6 +822,20 @@ class TestResilience:
     def test_resilient(self) -> None:
         from gauss.resilience import create_resilient_provider
         assert create_resilient_provider(1, [2, 3], True) == 102
+
+    def test_resilient_agent(self) -> None:
+        from gauss.agent import Agent
+        from gauss.resilience import create_resilient_agent
+
+        primary = Agent(name="primary")
+        fallback = Agent(name="fallback")
+        try:
+            handle = create_resilient_agent(primary, [fallback], True)
+            assert handle == 102
+            _mock_native.create_resilient_provider.assert_called_with(1, "[1]", True)
+        finally:
+            primary.destroy()
+            fallback.destroy()
 
 
 # ===========================================================================
@@ -1245,6 +1304,20 @@ class TestPipeline:
         result = reduce_sync([1, 2, 3], lambda acc, x: acc + x, 0)
         assert result == 6
 
+    @pytest.mark.asyncio
+    async def test_tap_async(self) -> None:
+        from gauss.pipeline import tap_async
+
+        seen: list[tuple[int, int]] = []
+
+        async def capture(value: int, index: int) -> None:
+            seen.append((value, index))
+
+        items = [4, 5, 6]
+        result = await tap_async(items, capture)
+        assert result == items
+        assert seen == [(4, 0), (5, 1), (6, 2)]
+
     def test_compose(self) -> None:
         from gauss.pipeline import compose
         fn = compose(lambda s: s.upper(), lambda s: f"[{s}]")
@@ -1253,7 +1326,7 @@ class TestPipeline:
     def test_exports(self) -> None:
         from gauss import (
             compose, compose_async, filter_async, filter_sync,
-            map_async, map_sync, pipe, reduce_async, reduce_sync,
+            map_async, map_sync, pipe, reduce_async, reduce_sync, tap_async,
         )
         assert callable(pipe)
         assert callable(map_async)
@@ -1262,6 +1335,7 @@ class TestPipeline:
         assert callable(filter_sync)
         assert callable(reduce_async)
         assert callable(reduce_sync)
+        assert callable(tap_async)
         assert callable(compose)
 
 

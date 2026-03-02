@@ -12,6 +12,11 @@ from gauss.a2a import (
     Task,
     TaskState,
     TaskStatus,
+    agent_message,
+    extract_text,
+    task_text,
+    text_message,
+    user_message,
 )
 
 
@@ -99,6 +104,14 @@ class TestA2aMessage:
         assert msg.role == "agent"
         assert msg.text == "Hi"
         assert msg.metadata == {"source": "test"}
+
+    def test_helper_builders_and_extract(self):
+        msg = text_message("hello")
+        assert msg.role == "user"
+        assert msg.text == "hello"
+        assert user_message("world").role == "user"
+        assert agent_message("done").role == "agent"
+        assert extract_text({"role": "agent", "parts": [{"type": "text", "text": "ok"}]}) == "ok"
 
 
 # ── TaskState Tests ───────────────────────────────────────────────────────────
@@ -211,6 +224,16 @@ class TestTask:
     def test_text_without_message(self):
         task = Task.from_dict({"id": "t2", "status": {"state": "submitted"}})
         assert task.text is None
+
+    def test_task_text_helper(self):
+        payload = {
+            "id": "t3",
+            "status": {
+                "state": "completed",
+                "message": {"role": "agent", "parts": [{"type": "text", "text": "result"}]},
+            },
+        }
+        assert task_text(payload) == "result"
 
 
 # ── A2aClient Construction Tests ─────────────────────────────────────────────

@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gauss.agent import Agent
 
 
 def create_fallback_provider(provider_handles: list[int]) -> int:
@@ -61,5 +65,18 @@ def create_resilient_provider(
     return _native_create(  # type: ignore[no-any-return]
         primary_handle,
         json.dumps(fallback_handles or []),
+        circuit_breaker,
+    )
+
+
+def create_resilient_agent(
+    primary: Agent,
+    fallbacks: list[Agent],
+    circuit_breaker: bool = True,
+) -> int:
+    """Create a resilient provider handle from primary/fallback Agent objects."""
+    return create_resilient_provider(
+        primary.handle,
+        [agent.handle for agent in fallbacks],
         circuit_breaker,
     )

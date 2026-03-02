@@ -363,3 +363,38 @@ class A2aClient:
             task_id,
         )
         return Task.from_dict(json.loads(raw))
+
+
+def text_message(text: str) -> A2aMessage:
+    """Build a user text message."""
+    return A2aMessage.user_text(text)
+
+
+def user_message(text: str) -> A2aMessage:
+    """Alias for text_message."""
+    return text_message(text)
+
+
+def agent_message(text: str) -> A2aMessage:
+    """Build an agent text message."""
+    return A2aMessage.agent_text(text)
+
+
+def extract_text(message: A2aMessage | dict[str, Any]) -> str:
+    """Extract concatenated text content from a message."""
+    msg = message if isinstance(message, A2aMessage) else A2aMessage.from_dict(message)
+    return msg.text
+
+
+def task_text(task: Task | dict[str, Any]) -> str:
+    """Extract text from task status message or first artifact."""
+    parsed = task if isinstance(task, Task) else Task.from_dict(task)
+    if parsed.text:
+        return parsed.text
+    if parsed.artifacts:
+        return "".join(
+            part.text
+            for part in parsed.artifacts[0].parts
+            if part.type == "text" and part.text
+        )
+    return ""

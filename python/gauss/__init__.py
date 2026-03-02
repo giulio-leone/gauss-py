@@ -29,8 +29,10 @@ from gauss._types import (
     Message,
     ProviderType,
     ToolDef,
+    detect_provider,
+    resolve_api_key,
 )
-from gauss.agent import Agent, enterprise_preset, gauss
+from gauss.agent import Agent, enterprise_preset, enterprise_run, gauss
 from gauss.models import (
     ANTHROPIC_DEFAULT,
     ANTHROPIC_FAST,
@@ -77,6 +79,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "execute_code": ("gauss.code_execution", "execute_code"),
     "available_runtimes": ("gauss.code_execution", "available_runtimes"),
     "generate_image": ("gauss.code_execution", "generate_image"),
+    "version": ("gauss.code_execution", "version"),
     # approval / hitl
     "ApprovalManager": ("gauss.approval", "ApprovalManager"),
     "CheckpointStore": ("gauss.checkpoint", "CheckpointStore"),
@@ -133,6 +136,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "filter_sync": ("gauss.pipeline", "filter_sync"),
     "reduce_async": ("gauss.pipeline", "reduce_async"),
     "reduce_sync": ("gauss.pipeline", "reduce_sync"),
+    "tap_async": ("gauss.pipeline", "tap_async"),
     "compose": ("gauss.pipeline", "compose"),
     "compose_async": ("gauss.pipeline", "compose_async"),
     # plugin
@@ -141,6 +145,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "create_fallback_provider": ("gauss.resilience", "create_fallback_provider"),
     "create_circuit_breaker": ("gauss.resilience", "create_circuit_breaker"),
     "create_resilient_provider": ("gauss.resilience", "create_resilient_provider"),
+    "create_resilient_agent": ("gauss.resilience", "create_resilient_agent"),
     # retry
     "RetryConfig": ("gauss.retry", "RetryConfig"),
     "retryable": ("gauss.retry", "retryable"),
@@ -198,6 +203,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "Task": ("gauss.a2a", "Task"),
     "TaskState": ("gauss.a2a", "TaskState"),
     "TaskStatus": ("gauss.a2a", "TaskStatus"),
+    "text_message": ("gauss.a2a", "text_message"),
+    "user_message": ("gauss.a2a", "user_message"),
+    "agent_message": ("gauss.a2a", "agent_message"),
+    "extract_text": ("gauss.a2a", "extract_text"),
+    "task_text": ("gauss.a2a", "task_text"),
     # errors
     "GaussError": ("gauss.errors", "GaussError"),
     "DisposedError": ("gauss.errors", "DisposedError"),
@@ -244,6 +254,7 @@ __all__ = [
     # One-liner
     "gauss",
     "enterprise_preset",
+    "enterprise_run",
     "batch",
     "BatchItem",
     # Streaming
@@ -274,6 +285,7 @@ __all__ = [
     "execute_code",
     "available_runtimes",
     "generate_image",
+    "version",
     # Core
     "Agent",
     "AgentConfig",
@@ -291,6 +303,8 @@ __all__ = [
     "ProviderCapabilities",
     "ProviderType",
     "ToolDef",
+    "detect_provider",
+    "resolve_api_key",
     # Memory & RAG
     "Memory",
     "VectorStore",
@@ -345,6 +359,7 @@ __all__ = [
     "create_fallback_provider",
     "create_circuit_breaker",
     "create_resilient_provider",
+    "create_resilient_agent",
     # Utilities
     "count_tokens",
     "count_tokens_for_model",
@@ -378,6 +393,7 @@ __all__ = [
     "filter_sync",
     "reduce_async",
     "reduce_sync",
+    "tap_async",
     "compose",
     "compose_async",
     # AGENTS.MD & SKILL.MD Parsers
@@ -398,6 +414,22 @@ __all__ = [
     "Task",
     "TaskState",
     "TaskStatus",
+    "text_message",
+    "user_message",
+    "agent_message",
+    "extract_text",
+    "task_text",
+    # Typed Tools / MCP Client / Pricing
+    "tool",
+    "TypedToolDef",
+    "create_tool_executor",
+    "McpClient",
+    "McpClientConfig",
+    "McpToolResult",
+    "ModelPricing",
+    "set_pricing",
+    "get_pricing",
+    "clear_pricing",
     # Tool Registry
     "ToolRegistry",
     "ToolRegistryEntry",

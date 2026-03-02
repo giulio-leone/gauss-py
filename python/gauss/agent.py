@@ -1154,3 +1154,9 @@ def enterprise_preset(config: AgentConfig | None = None, **kwargs: Any) -> Agent
         cfg.reasoning_effort = "medium"
 
     return Agent(cfg)
+
+
+def enterprise_run(prompt: str, config: AgentConfig | None = None, **kwargs: Any) -> str:
+    """One-liner enterprise helper: run prompt with enterprise defaults."""
+    with enterprise_preset(config=config, **kwargs) as agent:
+        return agent.run(prompt).text

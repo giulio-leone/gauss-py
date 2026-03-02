@@ -120,6 +120,13 @@ def available_runtimes() -> list[str]:
     return json.loads(result_json)
 
 
+def version() -> str:
+    """Return the native gauss-core runtime version."""
+    from gauss._native import version as _version
+
+    return str(_run_native(_version))
+
+
 def generate_image(
     prompt: str,
     *,

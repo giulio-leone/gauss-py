@@ -235,14 +235,15 @@ text_async = await agent.agenerate("write a haiku")
 - **Workflows / Networks**: `Workflow`, `Network`
 - **Typed tools**: `@tool`, `create_tool_executor()`, `with_tool()`
 - **MCP**: `McpServer`, `McpClient`
-- **A2A**: `A2aClient`
+- **A2A**: `A2aClient`, `text_message()`, `user_message()`, `agent_message()`, `extract_text()`, `task_text()`
 - **Memory + RAG**: `Memory`, `VectorStore`, `TextSplitter`, `load_text/load_markdown/load_json`
 - **Guardrails + Middleware**: `GuardrailChain`, `MiddlewareChain`
 - **Reliability**: retry, circuit breaker, fallback providers
+- **Pipeline helpers**: `pipe`, `map_*`, `filter_*`, `reduce_*`, `tap_async()`
 - **Observability & quality**: `Telemetry`, `EvalRunner`
 - **Control plane**: `ControlPlane` (local snapshot API + dashboard)
 - **Routing policy**: `RoutingPolicy`, `RoutingCandidate`, `resolve_routing_target()`
-- **Enterprise preset**: `enterprise_preset()`
+- **Enterprise preset**: `enterprise_preset()`, `enterprise_run()`
 
 ---
 
