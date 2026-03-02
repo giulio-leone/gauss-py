@@ -196,6 +196,9 @@ print(f"Control Plane: {url}")
 # single event quick-check -> GET {url}/api/stream?channel=timeline&once=1
 # multiplex channels -> GET {url}/api/stream?channels=snapshot,timeline&once=1
 # reconnect/replay cursor -> GET {url}/api/stream?channel=snapshot&lastEventId=42
+# hosted ops capabilities -> GET {url}/api/ops/capabilities
+# hosted ops health -> GET {url}/api/ops/health
+# hosted ops dashboard -> GET {url}/ops
 ```
 
 ### Async API

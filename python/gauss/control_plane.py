@@ -196,6 +196,18 @@ class ControlPlane:
                         self._send_json(payload)
                         return
 
+                    if parsed.path == "/api/ops/capabilities":
+                        payload = json.dumps(outer._ops_capabilities(), indent=2).encode(
+                            "utf-8"
+                        )
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/health":
+                        payload = json.dumps(outer._ops_health(), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
                     if parsed.path == "/api/stream":
                         filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         channels = outer._parse_stream_channels(params)
@@ -239,6 +251,15 @@ class ControlPlane:
 
                     if parsed.path == "/":
                         html = outer._render_dashboard_html().encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
+                        self.send_header("Content-Length", str(len(html)))
+                        self.end_headers()
+                        self.wfile.write(html)
+                        return
+
+                    if parsed.path == "/ops":
+                        html = outer._render_hosted_ops_html().encode("utf-8")
                         self.send_response(200)
                         self.send_header("Content-Type", "text/html; charset=utf-8")
                         self.send_header("Content-Length", str(len(html)))
@@ -549,6 +570,83 @@ class ControlPlane:
     }
     setInterval(refresh, 2000);
     refresh();
+  </script>
+</body>
+</html>"""
+
+    def _ops_capabilities(self) -> dict[str, Any]:
+        return {
+            "sections": ["spans", "metrics", "pending_approvals", "latest_cost"],
+            "channels": ["snapshot", "timeline", "dag"],
+            "supports_multiplex": True,
+            "supports_replay_cursor": True,
+            "supports_channel_rbac": True,
+            "hosted_dashboard_path": "/ops",
+        }
+
+    def _ops_health(self) -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "history_size": len(self._history),
+            "stream_buffer_size": len(self._stream_events),
+        }
+
+    def _render_hosted_ops_html(self) -> str:
+        return """<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>Gauss Hosted Ops Console</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; margin: 20px; background: #0b1020; color: #f5f7ff; }
+    .row { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    input, button { background: #111935; color: #f5f7ff; border: 1px solid #25315f; border-radius: 6px; padding: 8px; }
+    pre { background: #111935; border: 1px solid #25315f; padding: 12px; border-radius: 8px; max-height: 60vh; overflow: auto; }
+    .muted { color: #a9b4d0; }
+  </style>
+</head>
+<body>
+  <h1>Gauss Hosted Ops Console</h1>
+  <div class=\"muted\">Live stream viewer with multiplex channels + replay cursor support.</div>
+  <div class=\"row\">
+    <label>Token <input id=\"token\" placeholder=\"optional\" /></label>
+    <label>Last Event ID <input id=\"lastEventId\" placeholder=\"optional\" /></label>
+    <button id=\"connect\">Connect</button>
+  </div>
+  <div class=\"row\">
+    <label><input type=\"checkbox\" class=\"ch\" value=\"snapshot\" checked /> snapshot</label>
+    <label><input type=\"checkbox\" class=\"ch\" value=\"timeline\" checked /> timeline</label>
+    <label><input type=\"checkbox\" class=\"ch\" value=\"dag\" /> dag</label>
+  </div>
+  <pre id=\"out\">idle</pre>
+  <script>
+    let source;
+    const out = document.getElementById('out');
+    function selectedChannels() {
+      return [...document.querySelectorAll('.ch:checked')].map((node) => node.value);
+    }
+    function append(message) {
+      out.textContent = message + '\\n' + out.textContent;
+    }
+    document.getElementById('connect').addEventListener('click', () => {
+      if (source) source.close();
+      const token = document.getElementById('token').value.trim();
+      const lastEventId = document.getElementById('lastEventId').value.trim();
+      const channels = selectedChannels();
+      const qs = new URLSearchParams();
+      if (channels.length > 0) qs.set('channels', channels.join(','));
+      if (token) qs.set('token', token);
+      if (lastEventId) qs.set('lastEventId', lastEventId);
+      source = new EventSource('/api/stream?' + qs.toString());
+      source.onmessage = (event) => append(event.data);
+      source.onerror = () => append('stream disconnected');
+      append('stream connected');
+    });
+    fetch('/api/ops/capabilities')
+      .then((r) => r.json())
+      .then((j) => append('capabilities: ' + JSON.stringify(j)));
   </script>
 </body>
 </html>"""

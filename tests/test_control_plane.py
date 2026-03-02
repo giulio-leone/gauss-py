@@ -55,6 +55,27 @@ class TestControlPlane:
 
         cp.stop_server()
 
+    def test_exposes_hosted_ops_capabilities_health_and_dashboard(self):
+        cp = ControlPlane(telemetry=_DummyTelemetry(), approvals=_DummyApprovals())
+        cp.snapshot()
+        url = cp.start_server(port=0)
+
+        with urllib.request.urlopen(f"{url}/api/ops/capabilities") as resp:
+            caps = json.loads(resp.read().decode("utf-8"))
+            assert caps["supports_multiplex"] is True
+            assert caps["hosted_dashboard_path"] == "/ops"
+
+        with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
+            health = json.loads(resp.read().decode("utf-8"))
+            assert health["status"] == "ok"
+            assert health["history_size"] >= 1
+
+        with urllib.request.urlopen(f"{url}/ops") as resp:
+            html = resp.read().decode("utf-8")
+            assert "Gauss Hosted Ops Console" in html
+
+        cp.stop_server()
+
     def test_auth_token_protects_api(self):
         cp = ControlPlane(auth_token="secret-token")
         url = cp.start_server(port=0)
