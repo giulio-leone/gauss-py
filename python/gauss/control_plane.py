@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 
 
 _SECTION_KEYS = {"spans", "metrics", "pending_approvals", "latest_cost"}
+_STREAM_CHANNELS = {"snapshot", "timeline", "dag"}
 
 
 class _ControlPlaneForbiddenError(Exception):
@@ -190,6 +192,36 @@ class ControlPlane:
                         self._send_json(payload)
                         return
 
+                    if parsed.path == "/api/stream":
+                        filters = outer._apply_auth_claims(outer._parse_context_filters(params))
+                        channel = outer._parse_stream_channel(params.get("channel", [None])[0])
+                        once = params.get("once", ["0"])[0] in {"1", "true", "yes"}
+                        follow = params.get("follow", ["0"])[0] in {"1", "true", "yes"}
+                        interval_ms = int(params.get("interval_ms", ["1000"])[0] or "1000")
+                        if interval_ms < 100:
+                            interval_ms = 100
+
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                        self.send_header("Cache-Control", "no-cache")
+                        self.send_header("Connection", "keep-alive" if (follow and not once) else "close")
+                        self.end_headers()
+
+                        try:
+                            event = outer._build_stream_event(channel, filters)
+                            self._send_sse_event(channel, event)
+                            self.wfile.flush()
+                            if once or not follow:
+                                self.close_connection = True
+                                return
+                            while True:
+                                time.sleep(interval_ms / 1000.0)
+                                event = outer._build_stream_event(channel, filters)
+                                self._send_sse_event(channel, event)
+                                self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError):
+                            return
+
                     if parsed.path == "/":
                         html = outer._render_dashboard_html().encode("utf-8")
                         self.send_response(200)
@@ -223,6 +255,10 @@ class ControlPlane:
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
+
+            def _send_sse_event(self, event: str, payload: dict[str, Any]) -> None:
+                frame = f"event: {event}\ndata: {json.dumps(payload)}\n\n".encode("utf-8")
+                self.wfile.write(frame)
 
             def log_message(self, _format: str, *_args: object) -> None:
                 return
@@ -288,6 +324,29 @@ class ControlPlane:
             "tenant_id": params.get("tenant", [None])[0],
             "session_id": params.get("session", [None])[0],
             "run_id": params.get("run", [None])[0],
+        }
+
+    def _parse_stream_channel(self, channel: str | None) -> str:
+        if channel is None:
+            return "snapshot"
+        if channel in _STREAM_CHANNELS:
+            return channel
+        raise ValidationError(f'Unknown stream channel "{channel}"', "channel")
+
+    def _build_stream_event(self, channel: str, filters: dict[str, str | None]) -> dict[str, Any]:
+        snap = self._capture_snapshot()
+        if channel == "timeline":
+            payload: Any = self.timeline(filters)
+        elif channel == "dag":
+            payload = self.dag(filters)
+        else:
+            filtered = self._filter_history(filters)
+            payload = filtered[-1] if filtered else snap
+        return {
+            "event": channel,
+            "generated_at": snap["generated_at"],
+            "context": dict(filters),
+            "payload": payload,
         }
 
     def _apply_auth_claims(self, filters: dict[str, str | None]) -> dict[str, str | None]:

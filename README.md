@@ -192,6 +192,8 @@ cp = ControlPlane(
 cp.set_cost_usage(1200, 600)
 url = cp.start_server(port=0)
 print(f"Control Plane: {url}")
+# SSE stream (single event for quick checks):
+# GET {url}/api/stream?channel=timeline&once=1
 ```
 
 ### Async API

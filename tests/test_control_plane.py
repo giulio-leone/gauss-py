@@ -163,3 +163,24 @@ class TestControlPlane:
             assert dag["nodes"][0]["label"] == "agent.run"
 
         cp.stop_server()
+
+    def test_stream_endpoint_emits_sse_events(self):
+        cp = ControlPlane(
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+        )
+        cp.with_context({"tenant_id": "t-1", "session_id": "s-1", "run_id": "r-1"}).snapshot()
+
+        url = cp.start_server(port=0)
+        with urllib.request.urlopen(f"{url}/api/stream?channel=timeline&once=1") as resp:
+            assert resp.status == 200
+            assert "text/event-stream" in (resp.headers.get("Content-Type") or "")
+            body = resp.read().decode("utf-8")
+            assert "event: timeline" in body
+            data_line = next((line for line in body.splitlines() if line.startswith("data: ")), None)
+            assert data_line is not None
+            event = json.loads(data_line[6:])
+            assert event["event"] == "timeline"
+            assert isinstance(event["payload"], list)
+
+        cp.stop_server()
