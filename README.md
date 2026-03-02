@@ -115,7 +115,13 @@ network.destroy()
 
 # Built-in starter templates
 incident = Network.from_template("incident-response")
+support = Network.from_template("support-triage")
+risk = Network.from_template("fintech-risk-review")
+rag_ops = Network.from_template("rag-ops")
 incident.destroy()
+support.destroy()
+risk.destroy()
+rag_ops.destroy()
 ```
 
 ---
@@ -208,6 +214,7 @@ runtime_routed = routed_agent.with_routing_context(
     available_providers=[ProviderType.OPENAI],
     estimated_cost_usd=1.2,
     current_requests_per_minute=20,
+    current_hour_utc=11,
     governance_tags=["pci"],
 )
 
@@ -215,7 +222,7 @@ runtime_routed = routed_agent.with_routing_context(
 from gauss import apply_governance_pack
 hardened_policy = apply_governance_pack(
     RoutingPolicy(fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI]),
-    "enterprise_strict",
+    "balanced_mix",
 )
 ```
 
@@ -241,6 +248,7 @@ print(f"Control Plane: {url}")
 # hosted ops summary -> GET {url}/api/ops/summary
 # hosted ops tenant breakdown -> GET {url}/api/ops/tenants
 # hosted ops dashboard -> GET {url}/ops
+# hosted tenant dashboard -> GET {url}/ops/tenants
 ```
 
 ### Async API

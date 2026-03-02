@@ -67,6 +67,7 @@ class TestControlPlane:
             assert caps["supports_ops_summary"] is True
             assert caps["supports_ops_tenants"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
+            assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -88,6 +89,10 @@ class TestControlPlane:
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")
             assert "Gauss Hosted Ops Console" in html
+
+        with urllib.request.urlopen(f"{url}/ops/tenants") as resp:
+            html = resp.read().decode("utf-8")
+            assert "Gauss Hosted Tenant Ops" in html
 
         cp.stop_server()
 

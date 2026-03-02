@@ -111,6 +111,51 @@ class Network:
                     {"name": "remediator", "instructions": "Propose and execute remediation steps."},
                 ],
             }
+        if name == "support-triage":
+            return {
+                "supervisor": "support-lead",
+                "agents": [
+                    {"name": "support-lead", "instructions": "Coordinate support workload and escalations."},
+                    {"name": "triage-bot", "instructions": "Classify incoming support requests."},
+                    {"name": "resolver", "instructions": "Draft and validate customer resolutions."},
+                ],
+            }
+        if name == "fintech-risk-review":
+            return {
+                "supervisor": "risk-lead",
+                "agents": [
+                    {
+                        "name": "risk-lead",
+                        "instructions": "Approve risk recommendations and report rationale.",
+                    },
+                    {
+                        "name": "policy-analyst",
+                        "instructions": "Map events to compliance policy obligations.",
+                    },
+                    {
+                        "name": "fraud-scorer",
+                        "instructions": "Score suspicious patterns and flag anomalies.",
+                    },
+                ],
+            }
+        if name == "rag-ops":
+            return {
+                "supervisor": "rag-ops-lead",
+                "agents": [
+                    {
+                        "name": "rag-ops-lead",
+                        "instructions": "Coordinate retrieval quality and index freshness.",
+                    },
+                    {
+                        "name": "retrieval-auditor",
+                        "instructions": "Audit recall/precision and retrieval grounding.",
+                    },
+                    {
+                        "name": "index-maintainer",
+                        "instructions": "Propose chunking and indexing improvements.",
+                    },
+                ],
+            }
         raise ValidationError(f'Unknown network template "{name}"', "name")
 
     @classmethod

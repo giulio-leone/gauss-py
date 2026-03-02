@@ -279,6 +279,15 @@ class ControlPlane:
                         self.wfile.write(html)
                         return
 
+                    if parsed.path == "/ops/tenants":
+                        html = outer._render_hosted_tenant_ops_html().encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
+                        self.send_header("Content-Length", str(len(html)))
+                        self.end_headers()
+                        self.wfile.write(html)
+                        return
+
                     self.send_response(404)
                     self.end_headers()
                     self.wfile.write(b"Not found")
@@ -596,6 +605,7 @@ class ControlPlane:
             "supports_ops_summary": True,
             "supports_ops_tenants": True,
             "hosted_dashboard_path": "/ops",
+            "hosted_tenant_dashboard_path": "/ops/tenants",
         }
 
     def _ops_health(self) -> dict[str, Any]:
@@ -737,6 +747,7 @@ class ControlPlane:
 <body>
   <h1>Gauss Hosted Ops Console</h1>
   <div class=\"muted\">Live stream viewer with multiplex channels + replay cursor support.</div>
+  <div class=\"row\"><a href=\"/ops/tenants\" style=\"color:#9cc3ff\">Open tenant dashboard →</a></div>
   <div class=\"row\">
     <label>Token <input id=\"token\" placeholder=\"optional\" /></label>
     <label>Last Event ID <input id=\"lastEventId\" placeholder=\"optional\" /></label>
@@ -774,6 +785,55 @@ class ControlPlane:
     fetch('/api/ops/capabilities')
       .then((r) => r.json())
       .then((j) => append('capabilities: ' + JSON.stringify(j)));
+  </script>
+</body>
+</html>"""
+
+    def _render_hosted_tenant_ops_html(self) -> str:
+        return """<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>Gauss Hosted Tenant Ops</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; margin: 20px; background: #0b1020; color: #f5f7ff; }
+    .row { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    input, button { background: #111935; color: #f5f7ff; border: 1px solid #25315f; border-radius: 6px; padding: 8px; }
+    pre { background: #111935; border: 1px solid #25315f; padding: 12px; border-radius: 8px; max-height: 60vh; overflow: auto; }
+    a { color: #9cc3ff; }
+    .muted { color: #a9b4d0; }
+  </style>
+</head>
+<body>
+  <h1>Gauss Hosted Tenant Ops</h1>
+  <div class=\"muted\">Tenant-level operational metrics powered by <code>/api/ops/tenants</code>.</div>
+  <div class=\"row\"><a href=\"/ops\">← Back to stream console</a></div>
+  <div class=\"row\">
+    <label>Token <input id=\"token\" placeholder=\"optional\" /></label>
+    <label>Tenant <input id=\"tenant\" placeholder=\"optional filter\" /></label>
+    <button id=\"refresh\">Refresh</button>
+  </div>
+  <pre id=\"out\">loading...</pre>
+  <script>
+    const out = document.getElementById('out');
+    async function refresh() {
+      const token = document.getElementById('token').value.trim();
+      const tenant = document.getElementById('tenant').value.trim();
+      const qs = new URLSearchParams();
+      if (token) qs.set('token', token);
+      if (tenant) qs.set('tenant', tenant);
+      const target = '/api/ops/tenants' + (qs.toString() ? ('?' + qs.toString()) : '');
+      const r = await fetch(target);
+      if (!r.ok) {
+        out.textContent = 'HTTP ' + r.status + ': ' + await r.text();
+        return;
+      }
+      const j = await r.json();
+      out.textContent = JSON.stringify(j, null, 2);
+    }
+    document.getElementById('refresh').addEventListener('click', refresh);
+    refresh();
   </script>
 </body>
 </html>"""

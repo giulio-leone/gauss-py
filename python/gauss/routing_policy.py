@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from dataclasses import dataclass, field
 
 from gauss._types import ProviderType
@@ -33,6 +34,8 @@ class RoutingPolicy:
     fallback_order: list[ProviderType] = field(default_factory=list)
     max_total_cost_usd: float | None = None
     max_requests_per_minute: int | None = None
+    allowed_hours_utc: list[int] = field(default_factory=list)
+    provider_weights: dict[ProviderType, int] = field(default_factory=dict)
     governance: GovernancePolicyPack | None = None
 
 
@@ -64,6 +67,16 @@ def governance_policy_pack(name: str) -> GovernancePolicyPack:
                 GovernanceRule(type="require_tag", tag="cost-sensitive"),
             ]
         )
+    if name == "ops_business_hours":
+        return GovernancePolicyPack(rules=[GovernanceRule(type="require_tag", tag="ops")])
+    if name == "balanced_mix":
+        return GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                GovernanceRule(type="allow_provider", provider=ProviderType.ANTHROPIC),
+                GovernanceRule(type="require_tag", tag="balanced"),
+            ]
+        )
     raise RoutingPolicyError(f"unknown governance policy pack {name!r}")
 
 
@@ -72,14 +85,34 @@ def apply_governance_pack(
     pack_name: str,
 ) -> RoutingPolicy:
     pack = governance_policy_pack(pack_name)
+    allowed_hours_utc = (
+        list(range(8, 19))
+        if pack_name == "ops_business_hours"
+        else list(policy.allowed_hours_utc) if policy else []
+    )
+    provider_weights = (
+        {
+            **(policy.provider_weights if policy else {}),
+            ProviderType.OPENAI: 60,
+            ProviderType.ANTHROPIC: 40,
+        }
+        if pack_name == "balanced_mix"
+        else dict(policy.provider_weights) if policy else {}
+    )
     if policy is None:
-        return RoutingPolicy(governance=GovernancePolicyPack(rules=list(pack.rules)))
+        return RoutingPolicy(
+            allowed_hours_utc=allowed_hours_utc,
+            provider_weights=provider_weights,
+            governance=GovernancePolicyPack(rules=list(pack.rules)),
+        )
     existing = list(policy.governance.rules) if policy.governance else []
     return RoutingPolicy(
         aliases=dict(policy.aliases),
         fallback_order=list(policy.fallback_order),
         max_total_cost_usd=policy.max_total_cost_usd,
         max_requests_per_minute=policy.max_requests_per_minute,
+        allowed_hours_utc=allowed_hours_utc,
+        provider_weights=provider_weights,
         governance=GovernancePolicyPack(rules=[*existing, *pack.rules]),
     )
 
@@ -92,8 +125,10 @@ def resolve_routing_target(
     available_providers: list[ProviderType] | None = None,
     estimated_cost_usd: float | None = None,
     current_requests_per_minute: int | None = None,
+    current_hour_utc: int | None = None,
     governance_tags: list[str] | None = None,
 ) -> tuple[ProviderType, str]:
+    enforce_routing_time_window(policy, current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.UTC).hour)
     if estimated_cost_usd is not None:
         enforce_routing_cost_limit(policy, estimated_cost_usd)
     if current_requests_per_minute is not None:
@@ -104,13 +139,13 @@ def resolve_routing_target(
     candidates = policy.aliases.get(model)
     if candidates:
         if not available_providers:
-            selected = max(candidates, key=lambda c: c.priority)
+            selected = _select_weighted_candidate(policy, candidates)
             enforce_routing_governance(policy, selected.provider, governance_tags)
             return selected.provider, selected.model
         available = set(available_providers)
         viable = [candidate for candidate in candidates if candidate.provider in available]
         if viable:
-            selected = max(viable, key=lambda c: c.priority)
+            selected = _select_weighted_candidate(policy, viable)
             enforce_routing_governance(policy, selected.provider, governance_tags)
             return selected.provider, selected.model
 
@@ -156,6 +191,16 @@ def enforce_routing_rate_limit(
         raise RoutingPolicyError(f"routing policy rejected rate {requests_per_minute}")
 
 
+def enforce_routing_time_window(
+    policy: RoutingPolicy | None,
+    hour_utc: int,
+) -> None:
+    if policy is None or not policy.allowed_hours_utc:
+        return
+    if hour_utc not in policy.allowed_hours_utc:
+        raise RoutingPolicyError(f"routing policy rejected hour {hour_utc}")
+
+
 def enforce_routing_governance(
     policy: RoutingPolicy | None,
     provider: ProviderType,
@@ -183,3 +228,15 @@ def enforce_routing_governance(
             and rule.tag not in governance_tags
         ):
             raise RoutingPolicyError(f"routing policy governance missing tag {rule.tag}")
+
+
+def _select_weighted_candidate(
+    policy: RoutingPolicy,
+    candidates: list[RoutingCandidate],
+) -> RoutingCandidate:
+    if len(candidates) == 1:
+        return candidates[0]
+    return max(
+        candidates,
+        key=lambda c: (policy.provider_weights.get(c.provider, 0), c.priority),
+    )

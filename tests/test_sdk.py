@@ -368,6 +368,7 @@ class TestAgent:
             enforce_routing_cost_limit,
             enforce_routing_governance,
             enforce_routing_rate_limit,
+            enforce_routing_time_window,
         )
         from gauss.routing_policy import GovernancePolicyPack, GovernanceRule
         from gauss._types import ProviderType
@@ -381,6 +382,11 @@ class TestAgent:
         enforce_routing_rate_limit(policy, 10)
         with pytest.raises(RoutingPolicyError, match="routing policy rejected rate 11"):
             enforce_routing_rate_limit(policy, 11)
+
+        policy.allowed_hours_utc = [9, 10, 11]
+        enforce_routing_time_window(policy, 10)
+        with pytest.raises(RoutingPolicyError, match="routing policy rejected hour 20"):
+            enforce_routing_time_window(policy, 20)
 
         governance = RoutingPolicy(
             governance=GovernancePolicyPack(
@@ -436,6 +442,53 @@ class TestAgent:
 
         with pytest.raises(RoutingPolicyError, match="unknown governance policy pack"):
             governance_policy_pack("unknown-pack")
+
+    def test_routing_policy_weighted_mix_and_business_hours_pack(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.routing_policy import (
+            RoutingCandidate,
+            RoutingPolicy,
+            apply_governance_pack,
+            resolve_routing_target,
+        )
+
+        policy = RoutingPolicy(
+            aliases={
+                "fast-chat": [
+                    RoutingCandidate(
+                        provider=ProviderType.OPENAI,
+                        model="gpt-4o-mini",
+                        priority=1,
+                    ),
+                    RoutingCandidate(
+                        provider=ProviderType.ANTHROPIC,
+                        model="claude-3-5-haiku-latest",
+                        priority=10,
+                    ),
+                ]
+            },
+            provider_weights={
+                ProviderType.OPENAI: 100,
+                ProviderType.ANTHROPIC: 10,
+            },
+        )
+        provider, model = resolve_routing_target(
+            policy,
+            ProviderType.OPENAI,
+            "fast-chat",
+            available_providers=[ProviderType.OPENAI, ProviderType.ANTHROPIC],
+            current_hour_utc=12,
+        )
+        assert provider == ProviderType.OPENAI
+        assert model == "gpt-4o-mini"
+
+        business_hours = apply_governance_pack(None, "ops_business_hours")
+        assert 8 in business_hours.allowed_hours_utc
+        assert 18 in business_hours.allowed_hours_utc
+
+        balanced = apply_governance_pack(None, "balanced_mix")
+        assert balanced.provider_weights.get(ProviderType.OPENAI) == 60
+        assert balanced.provider_weights.get(ProviderType.ANTHROPIC) == 40
 
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
@@ -709,6 +762,9 @@ class TestNetwork:
         template = Network.template("research-delivery")
         assert template["supervisor"] == "lead"
         assert len(template["agents"]) >= 3
+        assert Network.template("support-triage")["supervisor"] == "support-lead"
+        assert Network.template("fintech-risk-review")["supervisor"] == "risk-lead"
+        assert Network.template("rag-ops")["supervisor"] == "rag-ops-lead"
 
         net = Network.from_template("incident-response")
         result = net.delegate("incident-commander", "Stabilize production incident")
