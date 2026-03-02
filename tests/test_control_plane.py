@@ -70,6 +70,34 @@ class TestControlPlane:
 
         cp.stop_server()
 
+    def test_auth_claims_enforce_scope(self):
+        cp = ControlPlane(
+            auth_token="claims-token",
+            auth_claims={
+                "tenant_id": "t-1",
+                "allowed_session_ids": ["s-1"],
+                "allowed_run_ids": ["r-1"],
+            },
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+        )
+        cp.with_context({"tenant_id": "t-1", "session_id": "s-1", "run_id": "r-1"}).snapshot()
+        url = cp.start_server(port=0)
+
+        with urllib.request.urlopen(f"{url}/api/history?token=claims-token") as resp:
+            assert resp.status == 200
+            history = json.loads(resp.read().decode("utf-8"))
+            assert len(history) == 1
+            assert history[0]["context"]["tenant_id"] == "t-1"
+
+        try:
+            urllib.request.urlopen(f"{url}/api/history?token=claims-token&tenant=t-2")
+            assert False, "Expected forbidden"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
+
+        cp.stop_server()
+
     def test_filters_history_timeline_dag_and_persistence(self):
         persist_path = os.path.join(tempfile.gettempdir(), f"gauss-cp-{os.getpid()}.jsonl")
         if os.path.exists(persist_path):

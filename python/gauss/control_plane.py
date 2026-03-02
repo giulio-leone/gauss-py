@@ -21,6 +21,10 @@ if TYPE_CHECKING:
 _SECTION_KEYS = {"spans", "metrics", "pending_approvals", "latest_cost"}
 
 
+class _ControlPlaneForbiddenError(Exception):
+    """Raised when control-plane scope violates auth claims."""
+
+
 class ControlPlane:
     """Aggregate telemetry, approvals, and cost snapshots behind a local API/UI."""
 
@@ -31,6 +35,7 @@ class ControlPlane:
         model: str = "gpt-5.2",
         *,
         auth_token: str | None = None,
+        auth_claims: dict[str, Any] | None = None,
         persist_path: str | None = None,
         history_limit: int = 200,
         context: dict[str, str] | None = None,
@@ -39,6 +44,7 @@ class ControlPlane:
         self._approvals = approvals
         self._model = model
         self._auth_token = auth_token
+        self._auth_claims: dict[str, Any] = dict(auth_claims or {})
         self._persist_path = persist_path
         self._history_limit = history_limit
         self._context: dict[str, str] = dict(context or {})
@@ -56,7 +62,12 @@ class ControlPlane:
         self._auth_token = token
         return self
 
+    def with_auth_claims(self, claims: dict[str, Any] | None) -> "ControlPlane":
+        self._auth_claims = dict(claims or {})
+        return self
+
     def with_context(self, context: dict[str, str]) -> "ControlPlane":
+        self._assert_context_allowed(context)
         self._context = dict(context)
         return self
 
@@ -156,22 +167,25 @@ class ControlPlane:
                         return
 
                     if parsed.path == "/api/history":
+                        filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         payload = json.dumps(
-                            outer.history(outer._parse_context_filters(params)), indent=2
+                            outer.history(filters), indent=2
                         ).encode("utf-8")
                         self._send_json(payload)
                         return
 
                     if parsed.path == "/api/timeline":
+                        filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         payload = json.dumps(
-                            outer.timeline(outer._parse_context_filters(params)), indent=2
+                            outer.timeline(filters), indent=2
                         ).encode("utf-8")
                         self._send_json(payload)
                         return
 
                     if parsed.path == "/api/dag":
+                        filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         payload = json.dumps(
-                            outer.dag(outer._parse_context_filters(params)), indent=2
+                            outer.dag(filters), indent=2
                         ).encode("utf-8")
                         self._send_json(payload)
                         return
@@ -188,6 +202,13 @@ class ControlPlane:
                     self.send_response(404)
                     self.end_headers()
                     self.wfile.write(b"Not found")
+                except _ControlPlaneForbiddenError as exc:
+                    payload = json.dumps({"error": str(exc)}).encode("utf-8")
+                    self.send_response(403)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
                 except Exception as exc:
                     payload = json.dumps({"error": str(exc)}).encode("utf-8")
                     self.send_response(500)
@@ -231,6 +252,7 @@ class ControlPlane:
         self.destroy()
 
     def _capture_snapshot(self) -> dict[str, Any]:
+        self._assert_context_allowed(self._context)
         item = {
             "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
             "context": dict(self._context),
@@ -268,6 +290,33 @@ class ControlPlane:
             "run_id": params.get("run", [None])[0],
         }
 
+    def _apply_auth_claims(self, filters: dict[str, str | None]) -> dict[str, str | None]:
+        if not self._auth_claims:
+            return filters
+        resolved = dict(filters)
+
+        claim_tenant = self._auth_claims.get("tenant_id")
+        if claim_tenant:
+            if resolved.get("tenant_id") and resolved["tenant_id"] != claim_tenant:
+                raise _ControlPlaneForbiddenError("Forbidden tenant scope")
+            resolved["tenant_id"] = resolved.get("tenant_id") or claim_tenant
+
+        allowed_sessions = self._auth_claims.get("allowed_session_ids") or []
+        session_id = resolved.get("session_id")
+        if session_id and allowed_sessions and session_id not in allowed_sessions:
+            raise _ControlPlaneForbiddenError("Forbidden session scope")
+        if not session_id and len(allowed_sessions) == 1:
+            resolved["session_id"] = allowed_sessions[0]
+
+        allowed_runs = self._auth_claims.get("allowed_run_ids") or []
+        run_id = resolved.get("run_id")
+        if run_id and allowed_runs and run_id not in allowed_runs:
+            raise _ControlPlaneForbiddenError("Forbidden run scope")
+        if not run_id and len(allowed_runs) == 1:
+            resolved["run_id"] = allowed_runs[0]
+
+        return resolved
+
     def _filter_history(self, filters: dict[str, str | None] | None) -> list[dict[str, Any]]:
         if not filters:
             return list(self._history)
@@ -298,6 +347,15 @@ class ControlPlane:
         if run_id and context.get("run_id") != run_id:
             return False
         return True
+
+    def _assert_context_allowed(self, context: dict[str, str]) -> None:
+        self._apply_auth_claims(
+            {
+                "tenant_id": context.get("tenant_id"),
+                "session_id": context.get("session_id"),
+                "run_id": context.get("run_id"),
+            }
+        )
 
     def _render_dashboard_html(self) -> str:
         return """<!doctype html>
