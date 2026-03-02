@@ -82,6 +82,10 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "CheckpointStore": ("gauss.checkpoint", "CheckpointStore"),
     # control plane
     "ControlPlane": ("gauss.control_plane", "ControlPlane"),
+    # routing policy
+    "RoutingPolicy": ("gauss.routing_policy", "RoutingPolicy"),
+    "RoutingCandidate": ("gauss.routing_policy", "RoutingCandidate"),
+    "resolve_routing_target": ("gauss.routing_policy", "resolve_routing_target"),
     # config
     "parse_agent_config": ("gauss.config", "parse_agent_config"),
     "resolve_env": ("gauss.config", "resolve_env"),
@@ -305,6 +309,10 @@ __all__ = [
     "CheckpointStore",
     # Unified Control Plane
     "ControlPlane",
+    # Routing Policy
+    "RoutingPolicy",
+    "RoutingCandidate",
+    "resolve_routing_target",
     # MCP
     "McpServer",
     "McpResource",

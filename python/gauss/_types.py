@@ -5,7 +5,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from gauss.routing_policy import RoutingPolicy
 
 
 class ProviderType(str, Enum):
@@ -269,6 +272,8 @@ class AgentConfig:
     """Enable native code execution / Gemini code interpreter."""
     response_modalities: list[str] | None = None
     """Response modalities (e.g. ["TEXT", "IMAGE"] for Gemini image generation)."""
+    routing_policy: RoutingPolicy | None = None
+    """Optional alias/fallback routing policy for provider+model selection."""
 
     def resolve(self) -> tuple[ProviderType, str, str]:
         """Resolve provider, model, and API key from config or env."""

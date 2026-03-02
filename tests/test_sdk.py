@@ -217,6 +217,61 @@ class TestAgent:
         agent.destroy()
         clone.destroy()
 
+    def test_routing_policy_resolves_alias_target(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.agent import Agent
+        from gauss.routing_policy import RoutingCandidate, RoutingPolicy
+
+        agent = Agent(
+            provider=ProviderType.OPENAI,
+            model="fast-chat",
+            routing_policy=RoutingPolicy(
+                aliases={
+                    "fast-chat": [
+                        RoutingCandidate(
+                            provider=ProviderType.OPENAI,
+                            model="gpt-4o-mini",
+                            priority=1,
+                        ),
+                        RoutingCandidate(
+                            provider=ProviderType.ANTHROPIC,
+                            model="claude-3-5-haiku-latest",
+                            priority=10,
+                        ),
+                    ]
+                }
+            ),
+        )
+
+        assert agent._model == "claude-3-5-haiku-latest"
+        assert _mock_native.create_provider.call_args[0][0] == "anthropic"
+        assert _mock_native.create_provider.call_args[0][1] == "claude-3-5-haiku-latest"
+        agent.destroy()
+
+    def test_with_routing_policy_clones_agent(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.agent import Agent
+        from gauss.routing_policy import RoutingCandidate, RoutingPolicy
+
+        agent = Agent(provider=ProviderType.OPENAI, model="fast-chat")
+        clone = agent.with_routing_policy(
+            RoutingPolicy(
+                aliases={
+                    "fast-chat": [
+                        RoutingCandidate(
+                            provider=ProviderType.ANTHROPIC,
+                            model="claude-3-5-haiku-latest",
+                            priority=10,
+                        )
+                    ]
+                }
+            )
+        )
+        assert clone is not agent
+        assert clone._model == "claude-3-5-haiku-latest"
+        agent.destroy()
+        clone.destroy()
+
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
         from gauss.agent import Agent

@@ -149,6 +149,24 @@ agent = Agent.from_env(system_prompt="Be precise.")
 
 # Clone with a different model
 fast_agent = agent.with_model("gpt-4.1")
+
+# Optional routing policy: alias + provider/model target
+from gauss import ProviderType, RoutingPolicy, RoutingCandidate
+
+routed_agent = Agent(
+    model="fast-chat",
+    routing_policy=RoutingPolicy(
+        aliases={
+            "fast-chat": [
+                RoutingCandidate(
+                    provider=ProviderType.ANTHROPIC,
+                    model="claude-3-5-haiku-latest",
+                    priority=10,
+                )
+            ]
+        }
+    ),
+)
 ```
 
 ### Unified Control Plane (M51 foundation)
@@ -193,6 +211,7 @@ text_async = await agent.agenerate("write a haiku")
 - **Reliability**: retry, circuit breaker, fallback providers
 - **Observability & quality**: `Telemetry`, `EvalRunner`
 - **Control plane**: `ControlPlane` (local snapshot API + dashboard)
+- **Routing policy**: `RoutingPolicy`, `RoutingCandidate`, `resolve_routing_target()`
 - **Enterprise preset**: `enterprise_preset()`
 
 ---

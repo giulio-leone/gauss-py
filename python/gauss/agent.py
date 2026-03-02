@@ -36,6 +36,7 @@ from gauss._types import (
 )
 from gauss.models import OPENAI_DEFAULT
 from gauss.errors import DisposedError, ProviderError, ToolExecutionError
+from gauss.routing_policy import RoutingPolicy, resolve_routing_target
 from gauss.stream import AgentStream
 from gauss.tool import TypedToolDef, create_tool_executor
 
@@ -152,6 +153,11 @@ class Agent:
         self._mcp_tools_loaded = False
 
         provider_type, model, api_key = self._config.resolve()
+        provider_type, model = resolve_routing_target(
+            self._config.routing_policy,
+            provider_type,
+            model,
+        )
 
         self._provider_handle = create_provider(
             provider_type.value,
@@ -695,6 +701,34 @@ class Agent:
             provider=provider,
             model=model,
             api_key=api_key,
+            tools=list(self._tools),
+        )
+        clone = Agent(config)
+        if self._middleware is not None:
+            clone.with_middleware(self._middleware)
+        if self._guardrails is not None:
+            clone.with_guardrails(self._guardrails)
+        if self._memory is not None:
+            clone.with_memory(self._memory, self._session_id)
+        for client in self._mcp_clients:
+            clone.use_mcp_server(client)
+        return clone
+
+    def with_routing_policy(self, routing_policy: RoutingPolicy | None) -> Agent:
+        """Clone this agent with a different routing policy.
+
+        Args:
+            routing_policy: Alias/fallback policy used to resolve provider+model targets.
+
+        Returns:
+            A new :class:`Agent` instance configured with ``routing_policy``.
+        """
+        from dataclasses import replace
+
+        self._check_alive()
+        config = replace(
+            self._config,
+            routing_policy=routing_policy,
             tools=list(self._tools),
         )
         clone = Agent(config)
