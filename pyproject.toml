@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "gauss-py"
-version = "2.0.19"
+version = "2.0.20"
 description = "Gauss AI — Production-grade AI agents powered by Rust"
 readme = "README.md"
 license = "MIT"
