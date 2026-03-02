@@ -189,6 +189,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "McpClient": ("gauss.mcp_client", "McpClient"),
     "McpClientConfig": ("gauss.mcp_client", "McpClientConfig"),
     "McpToolResult": ("gauss.mcp_client", "McpToolResult"),
+    # pricing (M42)
+    "ModelPricing": ("gauss.tokens", "ModelPricing"),
+    "set_pricing": ("gauss.tokens", "set_pricing"),
+    "get_pricing": ("gauss.tokens", "get_pricing"),
+    "clear_pricing": ("gauss.tokens", "clear_pricing"),
 }
 
 
