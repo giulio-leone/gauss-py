@@ -80,6 +80,8 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # approval / hitl
     "ApprovalManager": ("gauss.approval", "ApprovalManager"),
     "CheckpointStore": ("gauss.checkpoint", "CheckpointStore"),
+    # control plane
+    "ControlPlane": ("gauss.control_plane", "ControlPlane"),
     # config
     "parse_agent_config": ("gauss.config", "parse_agent_config"),
     "resolve_env": ("gauss.config", "resolve_env"),
@@ -301,6 +303,8 @@ __all__ = [
     # HITL
     "ApprovalManager",
     "CheckpointStore",
+    # Unified Control Plane
+    "ControlPlane",
     # MCP
     "McpServer",
     "McpResource",

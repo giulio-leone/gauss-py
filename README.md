@@ -151,6 +151,21 @@ agent = Agent.from_env(system_prompt="Be precise.")
 fast_agent = agent.with_model("gpt-4.1")
 ```
 
+### Unified Control Plane (M51 foundation)
+
+```python
+from gauss import ControlPlane, Telemetry, ApprovalManager
+
+cp = ControlPlane(
+    telemetry=Telemetry(),
+    approvals=ApprovalManager(),
+    model="gpt-5.2",
+)
+cp.set_cost_usage(1200, 600)
+url = cp.start_server(port=0)
+print(f"Control Plane: {url}")
+```
+
 ### Async API
 
 ```python
@@ -177,6 +192,7 @@ text_async = await agent.agenerate("write a haiku")
 - **Guardrails + Middleware**: `GuardrailChain`, `MiddlewareChain`
 - **Reliability**: retry, circuit breaker, fallback providers
 - **Observability & quality**: `Telemetry`, `EvalRunner`
+- **Control plane**: `ControlPlane` (local snapshot API + dashboard)
 - **Enterprise preset**: `enterprise_preset()`
 
 ---
