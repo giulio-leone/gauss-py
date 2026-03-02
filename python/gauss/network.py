@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from gauss._types import Message
+from gauss.errors import DisposedError
 
 
 class Network:
@@ -66,6 +67,27 @@ class Network:
         network_set_supervisor(self._handle, name)
         return self
 
+    @classmethod
+    def quick(cls, supervisor: str, agents: list[dict[str, Any]]) -> Network:
+        """Quick network builder from role descriptions."""
+        from gauss.agent import Agent
+
+        network = cls()
+        for spec in agents:
+            agent = Agent(
+                name=spec.get("name", "agent"),
+                provider=spec.get("provider"),
+                model=spec.get("model"),
+                system_prompt=spec.get("instructions"),
+            )
+            network.add_agent(
+                agent,
+                card_json=spec.get("card_json"),
+                connections=spec.get("connections"),
+            )
+        network.set_supervisor(supervisor)
+        return network
+
     def delegate(
         self,
         agent_name: str,
@@ -99,6 +121,14 @@ class Network:
             destroy_network(self._handle)
             self._destroyed = True
 
+    def agent_cards(self) -> list[dict[str, Any]]:
+        """Return network agent cards exposed by the native runtime."""
+        from gauss._native import network_agent_cards
+
+        self._check_alive()
+        cards_json = network_agent_cards(self._handle)
+        return json.loads(cards_json)  # type: ignore[no-any-return]
+
     def __enter__(self) -> Network:
         return self
 
@@ -110,4 +140,4 @@ class Network:
 
     def _check_alive(self) -> None:
         if self._destroyed:
-            raise RuntimeError("Network has been destroyed")
+            raise DisposedError("Network", "network")

@@ -98,6 +98,22 @@ print(out["final_text"])
 graph.destroy()
 ```
 
+### 3) Network.quick() (swarm delegation bootstrap)
+
+```python
+from gauss import Network
+
+network = Network.quick("supervisor", [
+    {"name": "supervisor", "instructions": "Delegate to best specialist."},
+    {"name": "math-expert", "instructions": "Solve math tasks precisely."},
+    {"name": "writer", "instructions": "Write concise user-facing output."},
+])
+
+delegated = network.delegate("math-expert", "What is 13 * 7?")
+print(delegated)
+network.destroy()
+```
+
 ---
 
 ## Agent DX
@@ -233,7 +249,7 @@ text_async = await agent.agenerate("write a haiku")
 - **Agents**: `Agent`, `gauss()`
 - **Teams**: `Team`, `Team.quick()`
 - **Graphs**: `Graph`, `Graph.pipeline()`, `add_conditional_edge()`
-- **Workflows / Networks**: `Workflow`, `Network`
+- **Workflows / Networks**: `Workflow`, `Network`, `Network.quick()`
 - **Typed tools**: `@tool`, `create_tool_executor()`, `with_tool()`
 - **MCP**: `McpServer`, `McpClient`
 - **A2A**: `A2aClient`, `text_message()`, `user_message()`, `agent_message()`, `extract_text()`, `task_text()`

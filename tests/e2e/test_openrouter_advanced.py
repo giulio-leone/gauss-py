@@ -277,7 +277,7 @@ class TestOpenRouterAdvanced:
         net.add_agent(supervisor)
         net.set_supervisor("supervisor")
 
-        cards_result = "N/A — agent_cards not exposed in Python SDK"
+        cards_result = str(net.agent_cards())
         latency = (time.time() - start) * 1000
 
         record(E2ETestResult(

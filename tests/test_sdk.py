@@ -655,6 +655,28 @@ class TestNetwork:
         a1.destroy()
         net.destroy()
 
+    def test_agent_cards(self) -> None:
+        from gauss.agent import Agent
+        from gauss.network import Network
+        a1 = Agent(name="analyst")
+        net = Network().add_agent(a1).set_supervisor("analyst")
+        cards = net.agent_cards()
+        assert cards == [{"name": "a1"}]
+        a1.destroy()
+        net.destroy()
+
+    def test_quick(self) -> None:
+        from gauss.network import Network
+
+        net = Network.quick("supervisor", [
+            {"name": "supervisor", "instructions": "Delegate work"},
+            {"name": "coder", "instructions": "Write code"},
+        ])
+        result = net.delegate("coder", "Implement feature")
+        assert result == {"result": "delegated"}
+        _mock_native.network_set_supervisor.assert_called_with(30, "supervisor")
+        net.destroy()
+
 
 # ===========================================================================
 # Middleware Tests

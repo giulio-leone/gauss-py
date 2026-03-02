@@ -135,11 +135,12 @@ class TestNetworkContextManager:
             net.set_supervisor("agent-1")
 
     def test_check_alive_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.network import Network
 
         net = Network()
         net.destroy()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(DisposedError):
             net.set_supervisor("agent-1")
 
 
