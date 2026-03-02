@@ -636,6 +636,73 @@ class Agent:
         self._session_id = session_id
         return self
 
+    # ── Async Execution (M41) ────────────────────────────────────────
+
+    async def arun(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentResult:
+        """Async version of :meth:`run`.
+
+        Runs the agent in a non-blocking way, suitable for ``asyncio``
+        event loops. Identical behaviour to :meth:`run` but awaitable.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+
+        Returns:
+            :class:`AgentResult` with the full response.
+
+        Example:
+            >>> result = await agent.arun("What is 2+2?")
+            >>> print(result.text)
+
+        .. versionadded:: 2.0.0
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.run, prompt)
+
+    async def agenerate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:
+        """Async version of :meth:`generate`.
+
+        Returns the generated text as a plain string, awaitable.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+
+        Returns:
+            The generated text as a plain ``str``.
+
+        Example:
+            >>> text = await agent.agenerate("Write a haiku")
+
+        .. versionadded:: 2.0.0
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.generate, prompt)
+
+    async def arun_with_tools(
+        self,
+        prompt: str | Sequence[Message | dict[str, str]],
+        tool_executor: Any,
+    ) -> AgentResult:
+        """Async version of :meth:`run_with_tools`.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+            tool_executor: A callable handling tool calls.
+
+        Returns:
+            :class:`AgentResult` with the final response.
+
+        .. versionadded:: 2.0.0
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.run_with_tools, prompt, tool_executor)
+
     def use_mcp_server(self, client: McpClient) -> Agent:
         """Consume tools from an external MCP server.
 
