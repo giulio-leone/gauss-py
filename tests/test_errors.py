@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import NoReturn
 from unittest.mock import MagicMock
 
 import pytest
-
 from gauss.errors import (
     DisposedError,
     GaussError,
@@ -46,51 +46,51 @@ def _mock_gauss_native(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestErrorHierarchy:
-    def test_gauss_error_is_exception(self):
+    def test_gauss_error_is_exception(self) -> None:
         assert issubclass(GaussError, Exception)
 
-    def test_disposed_error_inherits_gauss(self):
+    def test_disposed_error_inherits_gauss(self) -> None:
         assert issubclass(DisposedError, GaussError)
 
-    def test_provider_error_inherits_gauss(self):
+    def test_provider_error_inherits_gauss(self) -> None:
         assert issubclass(ProviderError, GaussError)
 
-    def test_tool_error_inherits_gauss(self):
+    def test_tool_error_inherits_gauss(self) -> None:
         assert issubclass(ToolExecutionError, GaussError)
 
-    def test_validation_error_inherits_gauss(self):
+    def test_validation_error_inherits_gauss(self) -> None:
         assert issubclass(ValidationError, GaussError)
 
-    def test_disposed_error_attributes(self):
+    def test_disposed_error_attributes(self) -> None:
         err = DisposedError("Agent", "my-agent")
         assert err.code == "RESOURCE_DISPOSED"
         assert err.resource_type == "Agent"
         assert err.resource_name == "my-agent"
         assert "my-agent" in str(err)
 
-    def test_provider_error_attributes(self):
+    def test_provider_error_attributes(self) -> None:
         err = ProviderError("openai", "rate limit exceeded")
         assert err.code == "PROVIDER_ERROR"
         assert err.provider == "openai"
         assert "[openai]" in str(err)
 
-    def test_tool_error_attributes(self):
+    def test_tool_error_attributes(self) -> None:
         err = ToolExecutionError("search", "timeout")
         assert err.code == "TOOL_EXECUTION_ERROR"
         assert err.tool_name == "search"
         assert "search" in str(err)
 
-    def test_validation_error_with_field(self):
+    def test_validation_error_with_field(self) -> None:
         err = ValidationError("must be positive", "temperature")
         assert err.code == "VALIDATION_ERROR"
         assert err.field == "temperature"
         assert "temperature" in str(err)
 
-    def test_validation_error_without_field(self):
+    def test_validation_error_without_field(self) -> None:
         err = ValidationError("config is invalid")
         assert err.field is None
 
-    def test_catch_gauss_error_catches_all(self):
+    def test_catch_gauss_error_catches_all(self) -> NoReturn:
         for err_class in [DisposedError, ProviderError, ToolExecutionError, ValidationError]:
             with pytest.raises(GaussError):
                 if err_class == DisposedError:
@@ -104,7 +104,7 @@ class TestErrorHierarchy:
 
 
 class TestAgentDisposedError:
-    def test_destroyed_agent_raises_disposed_error(self):
+    def test_destroyed_agent_raises_disposed_error(self) -> None:
         from gauss import Agent
 
         agent = Agent()
@@ -115,21 +115,21 @@ class TestAgentDisposedError:
 
 
 class TestWithTool:
-    def test_with_tool_returns_self(self):
+    def test_with_tool_returns_self(self) -> None:
         from gauss import Agent
 
         agent = Agent()
         result = agent.with_tool("test", "A test tool", {"x": {"type": "string"}})
         assert result is agent
 
-    def test_with_tool_adds_tool(self):
+    def test_with_tool_adds_tool(self) -> None:
         from gauss import Agent
 
         agent = Agent()
         agent.with_tool("calc", "Calculator", {"expr": {"type": "string"}}, execute=lambda expr: "42")
         assert any(t.name == "calc" for t in agent._tools if hasattr(t, "name"))
 
-    def test_with_tool_chaining(self):
+    def test_with_tool_chaining(self) -> None:
         from gauss import Agent
 
         agent = Agent()

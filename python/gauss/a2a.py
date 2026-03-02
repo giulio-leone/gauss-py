@@ -16,18 +16,25 @@ Example::
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from ._native import (
-    a2a_discover as _a2a_discover,
-    a2a_send_message as _a2a_send_message,
     a2a_ask as _a2a_ask,
-    a2a_get_task as _a2a_get_task,
+)
+from ._native import (
     a2a_cancel_task as _a2a_cancel_task,
 )
-
+from ._native import (
+    a2a_discover as _a2a_discover,
+)
+from ._native import (
+    a2a_get_task as _a2a_get_task,
+)
+from ._native import (
+    a2a_send_message as _a2a_send_message,
+)
 
 # ── Types ────────────────────────────────────────────────────────────────────
 

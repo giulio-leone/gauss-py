@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from gauss._types import ToolDef
-
 
 # Type alias for router functions used in conditional edges.
 RouterFn = Callable[[dict[str, Any]], str]

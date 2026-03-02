@@ -26,7 +26,7 @@ class _Approvals:
 
 
 class TestControlPlaneE2E:
-    def test_secured_end_to_end_flow(self):
+    def test_secured_end_to_end_flow(self) -> None:
         persist_path = os.path.join(tempfile.gettempdir(), f"gauss-cp-e2e-{os.getpid()}.jsonl")
         if os.path.exists(persist_path):
             os.remove(persist_path)
@@ -44,7 +44,7 @@ class TestControlPlaneE2E:
 
         try:
             urllib.request.urlopen(f"{url}/api/snapshot")
-            assert False, "Expected unauthorized"
+            raise AssertionError("Expected unauthorized")
         except urllib.error.HTTPError as exc:
             assert exc.code == 401
 
@@ -66,11 +66,11 @@ class TestControlPlaneE2E:
         cp.stop_server()
         clear_pricing()
         assert os.path.exists(persist_path)
-        with open(persist_path, "r", encoding="utf-8") as f:
+        with open(persist_path, encoding="utf-8") as f:
             assert len([line for line in f if line.strip()]) > 0
         os.remove(persist_path)
 
-    def test_stream_snapshot_simple_flow(self):
+    def test_stream_snapshot_simple_flow(self) -> None:
         cp = ControlPlane(
             telemetry=_Telemetry(),
             approvals=_Approvals(),
@@ -88,7 +88,7 @@ class TestControlPlaneE2E:
             assert event["payload"]["context"]["tenant_id"] == "t-simple"
         cp.stop_server()
 
-    def test_stream_timeline_scoped_flow(self):
+    def test_stream_timeline_scoped_flow(self) -> None:
         cp = ControlPlane(
             telemetry=_Telemetry(),
             approvals=_Approvals(),
@@ -114,7 +114,7 @@ class TestControlPlaneE2E:
             urllib.request.urlopen(
                 f"{url}/api/stream?token=stream-token&channel=timeline&tenant=tenant-b&once=1"
             )
-            assert False, "Expected forbidden scope"
+            raise AssertionError("Expected forbidden scope")
         except urllib.error.HTTPError as exc:
             assert exc.code == 403
 

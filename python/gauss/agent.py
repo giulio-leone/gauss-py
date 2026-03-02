@@ -18,7 +18,8 @@ One-liner::
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from gauss._types import (
     AgentConfig,
@@ -31,11 +32,8 @@ from gauss._types import (
     ProviderCapabilities,
     ProviderType,
     ToolDef,
-    detect_provider,
-    resolve_api_key,
 )
-from gauss.models import OPENAI_DEFAULT
-from gauss.errors import DisposedError, ProviderError, ToolExecutionError
+from gauss.errors import DisposedError
 from gauss.routing_policy import RoutingPolicy, resolve_routing_target
 from gauss.stream import AgentStream
 from gauss.tool import TypedToolDef, create_tool_executor
@@ -44,8 +42,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from gauss.guardrail import GuardrailChain
-    from gauss.memory import Memory
     from gauss.mcp_client import McpClient
+    from gauss.memory import Memory
     from gauss.middleware import MiddlewareChain
 
 

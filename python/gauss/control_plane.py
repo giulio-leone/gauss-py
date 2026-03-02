@@ -6,10 +6,11 @@ import datetime as dt
 import json
 import os
 import time
+from collections.abc import Callable
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 from gauss._types import ProviderType
@@ -53,7 +54,7 @@ class ControlPlane:
         telemetry: Telemetry | None = None,
         approvals: ApprovalManager | None = None,
         model: str = "gpt-5.2",
-        routing_policy: "RoutingPolicy | None" = None,
+        routing_policy: RoutingPolicy | None = None,
         *,
         auth_token: str | None = None,
         auth_claims: dict[str, Any] | None = None,
@@ -91,32 +92,32 @@ class ControlPlane:
         self._server: ThreadingHTTPServer | None = None
         self._server_thread: Thread | None = None
 
-    def with_model(self, model: str) -> "ControlPlane":
+    def with_model(self, model: str) -> ControlPlane:
         self._model = model
         return self
 
-    def with_routing_policy(self, routing_policy: "RoutingPolicy | None") -> "ControlPlane":
+    def with_routing_policy(self, routing_policy: RoutingPolicy | None) -> ControlPlane:
         self._routing_policy = routing_policy
         return self
 
-    def with_auth_token(self, token: str | None) -> "ControlPlane":
+    def with_auth_token(self, token: str | None) -> ControlPlane:
         self._auth_token = token
         return self
 
-    def with_auth_claims(self, claims: dict[str, Any] | None) -> "ControlPlane":
+    def with_auth_claims(self, claims: dict[str, Any] | None) -> ControlPlane:
         self._auth_claims = dict(claims or {})
         return self
 
-    def with_context(self, context: dict[str, str]) -> "ControlPlane":
+    def with_context(self, context: dict[str, str]) -> ControlPlane:
         self._assert_context_allowed(context)
         self._context = dict(context)
         return self
 
-    def on_policy_drift_alert(self, hook: Callable[[dict[str, Any]], None]) -> "ControlPlane":
+    def on_policy_drift_alert(self, hook: Callable[[dict[str, Any]], None]) -> ControlPlane:
         self._policy_drift_alert_hooks.append(hook)
         return self
 
-    def register_policy_drift_sink(self, sink_id: str) -> "ControlPlane":
+    def register_policy_drift_sink(self, sink_id: str) -> ControlPlane:
         normalized = str(sink_id).strip()
         if not normalized:
             raise ValidationError("sink_id must be a non-empty string", "sink_id")
@@ -132,7 +133,7 @@ class ControlPlane:
         reasoning_tokens: int | None = None,
         cache_read_tokens: int | None = None,
         cache_creation_tokens: int | None = None,
-    ) -> "ControlPlane":
+    ) -> ControlPlane:
         self._latest_cost = estimate_cost(
             self._model,
             input_tokens,
@@ -434,9 +435,7 @@ class ControlPlane:
             def _send_sse_event(self, event: str, payload: dict[str, Any]) -> None:
                 event_id = payload.get("id")
                 id_frame = f"id: {event_id}\n" if isinstance(event_id, int) else ""
-                frame = f"{id_frame}event: {event}\ndata: {json.dumps(payload)}\n\n".encode(
-                    "utf-8"
-                )
+                frame = f"{id_frame}event: {event}\ndata: {json.dumps(payload)}\n\n".encode()
                 self.wfile.write(frame)
 
             def log_message(self, _format: str, *_args: object) -> None:
@@ -460,7 +459,7 @@ class ControlPlane:
     def destroy(self) -> None:
         self.stop_server()
 
-    def __enter__(self) -> "ControlPlane":
+    def __enter__(self) -> ControlPlane:
         return self
 
     def __exit__(self, *_: Any) -> None:
@@ -665,8 +664,13 @@ class ControlPlane:
             out[provider] = self._parse_optional_int_value(weight_raw, field=f"{field}.{provider.value}") or 0
         return out
 
-    def _parse_policy_lifecycle_policy(self, params: dict[str, list[str]]) -> "RoutingPolicy":
-        from gauss.routing_policy import GovernancePolicyPack, GovernanceRule, RoutingCandidate, RoutingPolicy
+    def _parse_policy_lifecycle_policy(self, params: dict[str, list[str]]) -> RoutingPolicy:
+        from gauss.routing_policy import (
+            GovernancePolicyPack,
+            GovernanceRule,
+            RoutingCandidate,
+            RoutingPolicy,
+        )
 
         raw = params.get("policy", [None])[0]
         if raw is None or raw == "":
@@ -792,7 +796,7 @@ class ControlPlane:
             governance=governance,
         )
 
-    def _parse_optional_policy_from_query(self, params: dict[str, list[str]], key: str) -> "RoutingPolicy | None":
+    def _parse_optional_policy_from_query(self, params: dict[str, list[str]], key: str) -> RoutingPolicy | None:
         raw = params.get(key, [None])[0]
         if raw is None or raw == "":
             return None
@@ -1413,9 +1417,7 @@ class ControlPlane:
             return False
         if session_id and context.get("session_id") != session_id:
             return False
-        if run_id and context.get("run_id") != run_id:
-            return False
-        return True
+        return not (run_id and context.get("run_id") != run_id)
 
     def _assert_context_allowed(self, context: dict[str, str]) -> None:
         self._apply_auth_claims(

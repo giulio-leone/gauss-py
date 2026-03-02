@@ -46,9 +46,9 @@ class TestAsyncAgent:
     @pytest.mark.asyncio
     async def test_arun_returns_agent_result(self) -> None:
         """Test that arun returns an AgentResult."""
-        from gauss.agent import Agent
         from gauss._types import AgentResult
-        
+        from gauss.agent import Agent
+
         agent = Agent()
         result = await agent.arun("test")
         assert isinstance(result, AgentResult)
@@ -60,7 +60,7 @@ class TestAsyncAgent:
     async def test_agenerate_returns_string(self) -> None:
         """Test that agenerate returns a string."""
         from gauss.agent import Agent
-        
+
         agent = Agent()
         text = await agent.agenerate("test")
         assert isinstance(text, str)
@@ -72,14 +72,15 @@ class TestAsyncAgent:
     async def test_arun_with_tools_calls_executor(self) -> None:
         """Test that arun_with_tools invokes the tool executor."""
         import json
-        from gauss.agent import Agent
+
         from gauss._types import AgentResult
-        
+        from gauss.agent import Agent
+
         def mock_executor(call_json: str) -> str:
             """Tool executor that accepts JSON string and returns JSON string."""
             data = json.loads(call_json)
             return json.dumps({"result": f"Executed {data.get('tool', 'unknown')}"})
-        
+
         agent = Agent()
         result = await agent.arun_with_tools("test", mock_executor)
         assert isinstance(result, AgentResult)

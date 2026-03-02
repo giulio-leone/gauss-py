@@ -52,7 +52,7 @@ def record(r: E2ETestResult) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _skip_without_key():
+def _skip_without_key() -> None:
     if not OPENROUTER_KEY:
         pytest.skip("OPENROUTER_API_KEY not set")
 
@@ -194,9 +194,10 @@ class TestOpenRouterAdvanced:
 
     # ─── 7. Pipeline ─────────────────────────────────────────────────
     def test_pipeline(self) -> None:
+        import asyncio
+
         from gauss import Agent, AgentConfig
         from gauss.pipeline import pipe
-        import asyncio
 
         start = time.time()
 

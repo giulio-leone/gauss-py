@@ -2,25 +2,25 @@
 
 import pytest
 from gauss.tool_registry import (
+    ToolExample,
     ToolRegistry,
     ToolRegistryEntry,
-    ToolExample,
     ToolSearchResult,
 )
 
 
 class TestToolRegistry:
-    def test_create_destroy(self):
+    def test_create_destroy(self) -> None:
         reg = ToolRegistry()
         assert reg._handle >= 0
         reg.destroy()
 
-    def test_context_manager(self):
+    def test_context_manager(self) -> None:
         with ToolRegistry() as reg:
             assert reg._handle >= 0
         assert reg._destroyed
 
-    def test_add_chaining(self):
+    def test_add_chaining(self) -> None:
         reg = ToolRegistry()
         result = reg.add(
             ToolRegistryEntry(name="a", description="Tool A")
@@ -30,13 +30,13 @@ class TestToolRegistry:
         assert result is reg
         reg.destroy()
 
-    def test_add_dict(self):
+    def test_add_dict(self) -> None:
         reg = ToolRegistry()
         result = reg.add({"name": "x", "description": "Tool X"})
         assert result is reg
         reg.destroy()
 
-    def test_list(self):
+    def test_list(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(name="calc", description="Calculator", tags=["math"]))
             reg.add(ToolRegistryEntry(name="weather", description="Get weather", tags=["api"]))
@@ -45,7 +45,7 @@ class TestToolRegistry:
             assert tools[0].name == "calc"
             assert tools[1].name == "weather"
 
-    def test_search_by_name(self):
+    def test_search_by_name(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(name="calculator", description="Math calculator", tags=["math"]))
             reg.add(ToolRegistryEntry(name="weather", description="Get weather", tags=["api"]))
@@ -53,7 +53,7 @@ class TestToolRegistry:
             assert len(results) == 1
             assert results[0].name == "calculator"
 
-    def test_search_by_description(self):
+    def test_search_by_description(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(name="add", description="Add two numbers together"))
             reg.add(ToolRegistryEntry(name="concat", description="Concatenate strings"))
@@ -61,14 +61,14 @@ class TestToolRegistry:
             assert len(results) == 1
             assert results[0].name == "add"
 
-    def test_search_by_tag(self):
+    def test_search_by_tag(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(name="calc", description="Calc", tags=["math", "utility"]))
             reg.add(ToolRegistryEntry(name="plot", description="Plot", tags=["math", "viz"]))
             results = reg.search("math")
             assert len(results) == 2
 
-    def test_by_tag(self):
+    def test_by_tag(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(name="a", description="A", tags=["alpha", "beta"]))
             reg.add(ToolRegistryEntry(name="b", description="B", tags=["beta"]))
@@ -77,7 +77,7 @@ class TestToolRegistry:
             assert len(reg.by_tag("gamma")) == 1
             assert len(reg.by_tag("delta")) == 0
 
-    def test_add_with_examples(self):
+    def test_add_with_examples(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(
                 name="add",
@@ -89,12 +89,12 @@ class TestToolRegistry:
             tools = reg.list()
             assert len(tools[0].examples) == 1
 
-    def test_search_empty(self):
+    def test_search_empty(self) -> None:
         with ToolRegistry() as reg:
             reg.add(ToolRegistryEntry(name="calc", description="Calculator"))
             assert len(reg.search("nonexistent")) == 0
 
-    def test_throws_after_destroy(self):
+    def test_throws_after_destroy(self) -> None:
         reg = ToolRegistry()
         reg.destroy()
         with pytest.raises(RuntimeError, match="destroyed"):
@@ -106,12 +106,12 @@ class TestToolRegistry:
 
 
 class TestToolRegistryTypes:
-    def test_tool_example_frozen(self):
+    def test_tool_example_frozen(self) -> None:
         ex = ToolExample(description="Test", input={"x": 1})
         with pytest.raises(AttributeError):
             ex.description = "changed"  # type: ignore[misc]
 
-    def test_tool_registry_entry_to_dict(self):
+    def test_tool_registry_entry_to_dict(self) -> None:
         entry = ToolRegistryEntry(
             name="calc",
             description="Calculator",
@@ -123,7 +123,7 @@ class TestToolRegistryTypes:
         assert d["tags"] == ["math"]
         assert len(d["examples"]) == 1
 
-    def test_tool_registry_entry_from_dict(self):
+    def test_tool_registry_entry_from_dict(self) -> None:
         entry = ToolRegistryEntry.from_dict({
             "name": "calc",
             "description": "Calculator",
@@ -133,7 +133,7 @@ class TestToolRegistryTypes:
         assert entry.name == "calc"
         assert entry.tags == ["math"]
 
-    def test_tool_search_result_from_dict(self):
+    def test_tool_search_result_from_dict(self) -> None:
         result = ToolSearchResult.from_dict({
             "name": "calc",
             "description": "Calculator",

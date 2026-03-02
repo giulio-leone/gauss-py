@@ -32,10 +32,9 @@ def _patch_native(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # ─── Imports (after mock setup) ────────────────────────────────────
 
+from gauss.document_loader import load_json, load_markdown, load_text
 from gauss.text_splitter import TextSplitter, split_text
-from gauss.document_loader import load_text, load_markdown, load_json
 from gauss.vector_store import VectorStore
-
 
 # ─── TextSplitter ──────────────────────────────────────────────────
 

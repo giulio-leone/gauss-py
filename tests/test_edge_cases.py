@@ -5,13 +5,12 @@ Uses hypothesis for property-based testing.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 from unittest.mock import MagicMock
 
 import pytest
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
@@ -29,17 +28,25 @@ _mock_native.agent_run.return_value = json.dumps({
 _mock_native.generate.return_value = "Hello"
 _mock_native.stream_generate = MagicMock(return_value="[]")
 
-from gauss.agent import Agent, AgentConfig
-from gauss.batch import batch
-from gauss.retry import with_retry, retryable, RetryConfig, _compute_delay
-from gauss.structured import structured, StructuredConfig, _extract_json
-from gauss.template import template, PromptTemplate
-from gauss.pipeline import (
-    pipe, map_sync, map_async, filter_sync, filter_async,
-    reduce_sync, reduce_async, compose, compose_async,
-)
-
 import os
+from typing import NoReturn
+
+from gauss.agent import Agent
+from gauss.batch import batch
+from gauss.pipeline import (
+    compose,
+    filter_async,
+    filter_sync,
+    map_async,
+    map_sync,
+    pipe,
+    reduce_async,
+    reduce_sync,
+)
+from gauss.retry import RetryConfig, _compute_delay, retryable, with_retry
+from gauss.structured import _extract_json, structured
+from gauss.template import template
+
 # Set env for auto-detection so Agent() works
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-edge-case")
 
@@ -57,7 +64,7 @@ def _patch_native(monkeypatch: pytest.MonkeyPatch) -> None:
 class TestRetryEdgeCases:
     def test_max_retries_zero_means_no_retries(self) -> None:
         calls = 0
-        def fn():
+        def fn() -> NoReturn:
             nonlocal calls
             calls += 1
             raise ValueError("fail")
@@ -68,7 +75,7 @@ class TestRetryEdgeCases:
     def test_handles_non_exception_types(self) -> None:
         """Retry handles generic Exception subclasses."""
         attempts = 0
-        def fn():
+        def fn() -> str:
             nonlocal attempts
             attempts += 1
             if attempts < 3:
@@ -95,7 +102,7 @@ class TestRetryEdgeCases:
 
     def test_retry_if_stops_immediately(self) -> None:
         calls = 0
-        def fn():
+        def fn() -> NoReturn:
             nonlocal calls
             calls += 1
             raise ValueError("stop")
@@ -108,7 +115,7 @@ class TestRetryEdgeCases:
 
     def test_on_retry_receives_correct_attempts(self) -> None:
         attempts_seen: list[int] = []
-        def fn():
+        def fn() -> NoReturn:
             raise ValueError("fail")
         with pytest.raises(ValueError):
             with_retry(fn, config=RetryConfig(
@@ -126,7 +133,7 @@ class TestRetryEdgeCases:
 
     def test_kwargs_shorthand(self) -> None:
         calls = 0
-        def fn():
+        def fn() -> str:
             nonlocal calls
             calls += 1
             if calls < 2:
@@ -428,8 +435,10 @@ class TestPropertyPipeline:
     @given(st.integers(min_value=-1000, max_value=1000))
     @settings(max_examples=100)
     def test_compose_matches_manual(self, n: int) -> None:
-        f = lambda x: x * 2
-        g = lambda x: x + 1
+        def f(x):
+            return x * 2
+        def g(x):
+            return x + 1
         composed = compose(f, g)
         assert composed(n) == g(f(n))
 
@@ -439,7 +448,7 @@ class TestPropertyRetry:
     @settings(max_examples=30, deadline=None)
     def test_always_calls_at_least_once(self, max_retries: int) -> None:
         calls = 0
-        def fn():
+        def fn() -> NoReturn:
             nonlocal calls
             calls += 1
             raise ValueError("fail")

@@ -12,11 +12,10 @@ from __future__ import annotations
 
 import json
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 import pytest
-
 from gauss import (
     Agent,
     AgentConfig,
@@ -26,7 +25,6 @@ from gauss import (
     ToolValidator,
 )
 from gauss.tool_registry import ToolExample, ToolRegistryEntry
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ToolRegistry Tests

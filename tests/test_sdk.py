@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-import os
+from typing import NoReturn
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Mock the native module globally
@@ -121,7 +120,6 @@ _mock_native.team_run.return_value = json.dumps({
 _mock_native.destroy_team.return_value = None
 
 # stream_generate returns a JSON array of event objects (adjacently tagged)
-import asyncio
 
 async def _mock_stream_generate(provider_handle, messages_json, temperature=None, max_tokens=None):
     return json.dumps([
@@ -361,17 +359,18 @@ class TestAgent:
         assert model == "gpt-4o-mini"
 
     def test_routing_policy_cost_limit_helper(self) -> None:
+        from gauss._types import ProviderType
         from gauss.routing_policy import (
-            resolve_routing_target,
+            GovernancePolicyPack,
+            GovernanceRule,
             RoutingPolicy,
             RoutingPolicyError,
             enforce_routing_cost_limit,
             enforce_routing_governance,
             enforce_routing_rate_limit,
             enforce_routing_time_window,
+            resolve_routing_target,
         )
-        from gauss.routing_policy import GovernancePolicyPack, GovernanceRule
-        from gauss._types import ProviderType
 
         policy = RoutingPolicy(max_total_cost_usd=1.0)
         enforce_routing_cost_limit(policy, 0.5)
@@ -717,7 +716,7 @@ class TestGraph:
 
     def test_context_manager(self) -> None:
         from gauss.graph import Graph
-        with Graph() as g:
+        with Graph():
             pass
         _mock_native.destroy_graph.assert_called_once()
 
@@ -775,7 +774,7 @@ class TestWorkflow:
 
     def test_context_manager(self) -> None:
         from gauss.workflow import Workflow
-        with Workflow() as wf:
+        with Workflow():
             pass
         _mock_native.destroy_workflow.assert_called_once()
 
@@ -1044,7 +1043,12 @@ class TestResilience:
 
 class TestTokens:
     def test_count(self) -> None:
-        from gauss.tokens import count_tokens, count_tokens_for_model, count_message_tokens, get_context_window_size
+        from gauss.tokens import (
+            count_message_tokens,
+            count_tokens,
+            count_tokens_for_model,
+            get_context_window_size,
+        )
         assert count_tokens("hello") == 42
         assert count_tokens_for_model("hello", "gpt-4") == 45
         assert count_message_tokens([{"role": "user", "content": "hi"}]) == 100
@@ -1199,7 +1203,7 @@ class TestRetry:
     def test_succeeds_first_try(self) -> None:
         from gauss.retry import with_retry
         calls = 0
-        def fn():
+        def fn() -> str:
             nonlocal calls
             calls += 1
             return "ok"
@@ -1207,9 +1211,9 @@ class TestRetry:
         assert calls == 1
 
     def test_retries_on_failure(self) -> None:
-        from gauss.retry import with_retry, RetryConfig
+        from gauss.retry import RetryConfig, with_retry
         calls = 0
-        def fn():
+        def fn() -> str:
             nonlocal calls
             calls += 1
             if calls < 3:
@@ -1220,16 +1224,16 @@ class TestRetry:
         assert calls == 3
 
     def test_throws_after_max_retries(self) -> None:
-        from gauss.retry import with_retry, RetryConfig
-        def fn():
+        from gauss.retry import RetryConfig, with_retry
+        def fn() -> NoReturn:
             raise RuntimeError("always fail")
         with pytest.raises(RuntimeError, match="always fail"):
             with_retry(fn, RetryConfig(max_retries=2, base_delay_s=0.001))
 
     def test_retry_if_predicate(self) -> None:
-        from gauss.retry import with_retry, RetryConfig
+        from gauss.retry import RetryConfig, with_retry
         calls = 0
-        def fn():
+        def fn() -> NoReturn:
             nonlocal calls
             calls += 1
             if calls == 1:
@@ -1244,9 +1248,9 @@ class TestRetry:
         assert calls == 2
 
     def test_on_retry_callback(self) -> None:
-        from gauss.retry import with_retry, RetryConfig
+        from gauss.retry import RetryConfig, with_retry
         retries = []
-        def fn():
+        def fn() -> str:
             if len(retries) < 1:
                 raise RuntimeError("fail")
             return "ok"
@@ -1260,7 +1264,7 @@ class TestRetry:
 
     def test_retryable_wraps_agent(self) -> None:
         from gauss import Agent
-        from gauss.retry import retryable, RetryConfig
+        from gauss.retry import RetryConfig, retryable
         agent = Agent()
         run = retryable(agent, RetryConfig(max_retries=1, base_delay_s=0.001))
         result = run("Hello")
@@ -1443,7 +1447,6 @@ class TestPipeline:
 
     @pytest.mark.asyncio
     async def test_pipe_async_steps(self) -> None:
-        import asyncio
         from gauss.pipeline import pipe
         async def double(n: int) -> int:
             return n * 2
@@ -1525,8 +1528,15 @@ class TestPipeline:
 
     def test_exports(self) -> None:
         from gauss import (
-            compose, compose_async, filter_async, filter_sync,
-            map_async, map_sync, pipe, reduce_async, reduce_sync, tap_async,
+            compose,
+            filter_async,
+            filter_sync,
+            map_async,
+            map_sync,
+            pipe,
+            reduce_async,
+            reduce_sync,
+            tap_async,
         )
         assert callable(pipe)
         assert callable(map_async)
@@ -1599,7 +1609,7 @@ class TestTeam:
 
     def test_context_manager(self) -> None:
         from gauss.team import Team
-        with Team("t") as t:
+        with Team("t"):
             pass
         _mock_native.destroy_team.assert_called_once()
 

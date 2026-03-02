@@ -12,11 +12,10 @@ from __future__ import annotations
 
 import json
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 import pytest
-
 from gauss import (
     A2aClient,
     A2aMessage,
@@ -25,7 +24,6 @@ from gauss import (
     McpResource,
     McpServer,
 )
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MCP Server Tests

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from gauss._types import CostEstimate
 
 # ─── Runtime Pricing Override ────────────────────────────────────────
 
@@ -106,7 +108,7 @@ def estimate_cost(
     reasoning_tokens: int | None = None,
     cache_read_tokens: int | None = None,
     cache_creation_tokens: int | None = None,
-) -> "CostEstimate":
+) -> CostEstimate:
     """Estimate request cost from token usage for a model."""
     from gauss._types import CostEstimate
 

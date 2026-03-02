@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 import subprocess
 import threading
-import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -123,7 +122,7 @@ class McpClient:
         self._reader_thread.start()
 
         # Initialize handshake
-        result = self._request("initialize", {
+        self._request("initialize", {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {"name": "gauss-mcp-client", "version": "1.2.0"},

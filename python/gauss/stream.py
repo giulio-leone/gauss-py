@@ -152,8 +152,9 @@ class AgentStream:
             provider.  After the iterator is exhausted, :attr:`text`
             contains the full concatenated response.
         """
-        from gauss._native import stream_generate
         import inspect
+
+        from gauss._native import stream_generate
 
         messages_json = json.dumps(self._messages)
         result = stream_generate(

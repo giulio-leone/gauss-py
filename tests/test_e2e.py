@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import json
 import sys
-import pytest
 from unittest.mock import MagicMock
 
-from gauss.tool import tool, TypedToolDef, create_tool_executor
-from gauss.mcp_client import McpClientConfig
-from gauss.tokens import set_pricing, get_pricing, clear_pricing, ModelPricing
+import pytest
+from gauss.tokens import ModelPricing, clear_pricing, get_pricing, set_pricing
+from gauss.tool import TypedToolDef, tool
 
 # ── Mock native module ───────────────────────────────────────────────
 _mock = MagicMock()
@@ -89,18 +88,16 @@ def _patch_native(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 from gauss.agent import Agent
-from gauss.memory import Memory
-from gauss.middleware import MiddlewareChain
-from gauss.guardrail import GuardrailChain
-from gauss.team import Team
 from gauss.graph import Graph
-from gauss.tokens import estimate_cost, count_tokens
-
+from gauss.guardrail import GuardrailChain
+from gauss.middleware import MiddlewareChain
+from gauss.team import Team
+from gauss.tokens import count_tokens, estimate_cost
 
 # ─── E2E 1: Basic Agent lifecycle ────────────────────────────────────
 
 class TestE2EBasicAgent:
-    def test_create_run_destroy(self):
+    def test_create_run_destroy(self) -> None:
         agent = Agent(api_key="sk-test")
         result = agent.run("Hello!")
 
@@ -111,7 +108,7 @@ class TestE2EBasicAgent:
         agent.destroy()
         _mock.destroy_provider.assert_called_once()
 
-    def test_agent_generate(self):
+    def test_agent_generate(self) -> None:
         agent = Agent(api_key="sk-test")
         result = agent.generate([{"role": "user", "content": "Hi"}])
 
@@ -123,7 +120,7 @@ class TestE2EBasicAgent:
 # ─── E2E 2: Typed tools ──────────────────────────────────────────────
 
 class TestE2ETypedTools:
-    def test_tool_decorator_and_agent_execution(self):
+    def test_tool_decorator_and_agent_execution(self) -> None:
         @tool
         def calculator(expression: str) -> dict:
             """Evaluate a math expression."""
@@ -140,7 +137,7 @@ class TestE2ETypedTools:
         _mock.agent_run_with_tool_executor.assert_called_once()
         agent.destroy()
 
-    def test_multiple_typed_tools(self):
+    def test_multiple_typed_tools(self) -> None:
         @tool
         def search(query: str) -> dict:
             """Search."""
@@ -153,7 +150,7 @@ class TestE2ETypedTools:
 
         agent = Agent(api_key="sk-test")
         agent.add_tools([search, fetch])
-        result = agent.run("Search and fetch")
+        agent.run("Search and fetch")
 
         _mock.agent_run_with_tool_executor.assert_called_once()
         agent.destroy()
@@ -162,7 +159,7 @@ class TestE2ETypedTools:
 # ─── E2E 3: Middleware chain ──────────────────────────────────────────
 
 class TestE2EMiddleware:
-    def test_full_middleware_chain(self):
+    def test_full_middleware_chain(self) -> None:
         chain = MiddlewareChain()
         chain.use_logging()
         chain.use_caching(ttl_ms=5000)
@@ -184,7 +181,7 @@ class TestE2EMiddleware:
 # ─── E2E 4: Guardrail chain ──────────────────────────────────────────
 
 class TestE2EGuardrails:
-    def test_full_guardrail_chain(self):
+    def test_full_guardrail_chain(self) -> None:
         chain = GuardrailChain()
         chain.add_pii_detection("redact")
         chain.add_content_moderation(blocked_categories=["bad"], warned_categories=["risky"])
@@ -204,7 +201,7 @@ class TestE2EGuardrails:
 # ─── E2E 5: Memory integration ───────────────────────────────────────
 
 class TestE2EMemory:
-    def test_memory_multi_turn(self):
+    def test_memory_multi_turn(self) -> None:
         memory = MagicMock()
         memory.recall.return_value = []
         memory._handle = 2
@@ -232,7 +229,7 @@ class TestE2EMemory:
 # ─── E2E 6: Multi-agent team ─────────────────────────────────────────
 
 class TestE2ETeam:
-    def test_sequential_team(self):
+    def test_sequential_team(self) -> None:
         team = Team("research-team")
 
         agent1 = Agent(api_key="sk-test", name="researcher")
@@ -253,7 +250,7 @@ class TestE2ETeam:
 # ─── E2E 7: Graph DAG ────────────────────────────────────────────────
 
 class TestE2EGraph:
-    def test_dag_execution(self):
+    def test_dag_execution(self) -> None:
         agent1 = Agent(api_key="sk-test", name="analyzer")
         agent2 = Agent(api_key="sk-test", name="summarizer")
 
@@ -273,9 +270,9 @@ class TestE2EGraph:
 # ─── E2E 8: Cost tracking ────────────────────────────────────────────
 
 class TestE2ECostTracking:
-    def test_estimate_cost_for_run(self):
+    def test_estimate_cost_for_run(self) -> None:
         agent = Agent(api_key="sk-test")
-        result = agent.run("Hello")
+        agent.run("Hello")
 
         # Use known token counts from the run
         cost = estimate_cost("gpt-4o", 10, 5)
@@ -284,7 +281,7 @@ class TestE2ECostTracking:
         assert cost.total_cost_usd == 0.003
         agent.destroy()
 
-    def test_count_tokens(self):
+    def test_count_tokens(self) -> None:
         n = count_tokens("Hello, world!")
         assert n == 5
 
@@ -292,7 +289,7 @@ class TestE2ECostTracking:
 # ─── E2E 9: Enterprise preset ────────────────────────────────────────
 
 class TestE2EEnterprisePreset:
-    def test_enterprise_agent(self):
+    def test_enterprise_agent(self) -> None:
         from gauss.agent import enterprise_preset
 
         agent = enterprise_preset(api_key="sk-test")
@@ -305,7 +302,7 @@ class TestE2EEnterprisePreset:
 # ─── E2E 10: Pricing override ────────────────────────────────────────
 
 class TestE2EPricingOverride:
-    def test_set_and_get_pricing(self):
+    def test_set_and_get_pricing(self) -> None:
         pricing = ModelPricing(
             input_per_token=0.000003,
             output_per_token=0.000015,
@@ -317,7 +314,7 @@ class TestE2EPricingOverride:
         assert retrieved.input_per_token == 0.000003
         assert retrieved.output_per_token == 0.000015
 
-    def test_custom_pricing_in_estimate(self):
+    def test_custom_pricing_in_estimate(self) -> None:
         set_pricing("custom-model", ModelPricing(
             input_per_token=0.00001,
             output_per_token=0.00003,
@@ -330,7 +327,7 @@ class TestE2EPricingOverride:
         assert cost.output_cost_usd == pytest.approx(0.015)
         assert cost.total_cost_usd == pytest.approx(0.025)
 
-    def test_clear_pricing(self):
+    def test_clear_pricing(self) -> None:
         set_pricing("temp-model", ModelPricing(input_per_token=0.001, output_per_token=0.002))
         assert get_pricing("temp-model") is not None
 

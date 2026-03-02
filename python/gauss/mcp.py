@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any
 
 from gauss._types import ToolDef
-
 
 # ── MCP Types ────────────────────────────────────────────────────
 
@@ -293,6 +291,7 @@ class McpServer:
     async def handle_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle an incoming MCP JSON-RPC message."""
         import inspect
+
         from gauss._native import mcp_server_handle
 
         self._check_alive()

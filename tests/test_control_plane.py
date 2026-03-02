@@ -28,14 +28,14 @@ class _DummyApprovals:
 
 
 class TestControlPlane:
-    def test_snapshot_contains_sections(self):
+    def test_snapshot_contains_sections(self) -> None:
         cp = ControlPlane(telemetry=_DummyTelemetry(), approvals=_DummyApprovals())
         snap = cp.snapshot()
         assert snap["spans"][0]["name"] == "agent.run"
         assert snap["metrics"]["total_spans"] == 1
         assert snap["pending_approvals"][0]["id"] == "req-1"
 
-    def test_set_cost_usage(self):
+    def test_set_cost_usage(self) -> None:
         set_pricing("cp-test-model", ModelPricing(input_per_token=0.001, output_per_token=0.002))
         cp = ControlPlane(model="cp-test-model")
         cp.set_cost_usage(10, 5)
@@ -43,7 +43,7 @@ class TestControlPlane:
         assert snap["latest_cost"]["total_cost_usd"] == 0.02
         clear_pricing()
 
-    def test_server_exposes_snapshot_and_html(self):
+    def test_server_exposes_snapshot_and_html(self) -> None:
         cp = ControlPlane(telemetry=_DummyTelemetry(), approvals=_DummyApprovals())
         url = cp.start_server(port=0)
         with urllib.request.urlopen(f"{url}/api/snapshot") as resp:
@@ -57,7 +57,7 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_exposes_hosted_ops_capabilities_health_and_dashboard(self):
+    def test_exposes_hosted_ops_capabilities_health_and_dashboard(self) -> None:
         cp = ControlPlane(
             telemetry=_DummyTelemetry(),
             approvals=_DummyApprovals(),
@@ -255,7 +255,7 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_policy_lifecycle_enforces_rbac_roles_and_audit_metadata(self):
+    def test_policy_lifecycle_enforces_rbac_roles_and_audit_metadata(self) -> None:
         cp = ControlPlane(
             auth_token="claims-token",
             auth_claims={"roles": ["author"]},
@@ -285,7 +285,7 @@ class TestControlPlane:
             urllib.request.urlopen(
                 f"{url}/api/ops/policy/lifecycle/approve?token=claims-token&version={version_id}&role=author"
             )
-            assert False, "Expected forbidden"
+            raise AssertionError("Expected forbidden")
         except urllib.error.HTTPError as exc:
             assert exc.code == 403
 
@@ -302,7 +302,7 @@ class TestControlPlane:
             urllib.request.urlopen(
                 f"{url}/api/ops/policy/lifecycle/promote?token=claims-token&version={version_id}&role=reviewer"
             )
-            assert False, "Expected forbidden"
+            raise AssertionError("Expected forbidden")
         except urllib.error.HTTPError as exc:
             assert exc.code == 403
 
@@ -317,13 +317,13 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_auth_token_protects_api(self):
+    def test_auth_token_protects_api(self) -> None:
         cp = ControlPlane(auth_token="secret-token")
         url = cp.start_server(port=0)
 
         try:
             urllib.request.urlopen(f"{url}/api/snapshot")
-            assert False, "Expected unauthorized"
+            raise AssertionError("Expected unauthorized")
         except urllib.error.HTTPError as exc:
             assert exc.code == 401
 
@@ -332,7 +332,7 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_auth_claims_enforce_scope(self):
+    def test_auth_claims_enforce_scope(self) -> None:
         cp = ControlPlane(
             auth_token="claims-token",
             auth_claims={
@@ -354,13 +354,13 @@ class TestControlPlane:
 
         try:
             urllib.request.urlopen(f"{url}/api/history?token=claims-token&tenant=t-2")
-            assert False, "Expected forbidden"
+            raise AssertionError("Expected forbidden")
         except urllib.error.HTTPError as exc:
             assert exc.code == 403
 
         cp.stop_server()
 
-    def test_filters_history_timeline_dag_and_persistence(self):
+    def test_filters_history_timeline_dag_and_persistence(self) -> None:
         persist_path = os.path.join(tempfile.gettempdir(), f"gauss-cp-{os.getpid()}.jsonl")
         if os.path.exists(persist_path):
             os.remove(persist_path)
@@ -395,12 +395,12 @@ class TestControlPlane:
         cp.stop_server()
         clear_pricing()
         assert os.path.exists(persist_path)
-        with open(persist_path, "r", encoding="utf-8") as f:
+        with open(persist_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if line.strip()]
             assert len(lines) >= 1
         os.remove(persist_path)
 
-    def test_supports_tenant_session_filters(self):
+    def test_supports_tenant_session_filters(self) -> None:
         cp = ControlPlane(
             telemetry=_DummyTelemetry(),
             approvals=_DummyApprovals(),
@@ -426,7 +426,7 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_stream_endpoint_emits_sse_events(self):
+    def test_stream_endpoint_emits_sse_events(self) -> None:
         cp = ControlPlane(
             telemetry=_DummyTelemetry(),
             approvals=_DummyApprovals(),
@@ -448,7 +448,7 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_stream_supports_multiplex_and_replay_cursor(self):
+    def test_stream_supports_multiplex_and_replay_cursor(self) -> None:
         cp = ControlPlane(
             telemetry=_DummyTelemetry(),
             approvals=_DummyApprovals(),
@@ -474,7 +474,7 @@ class TestControlPlane:
 
         cp.stop_server()
 
-    def test_stream_enforces_channel_rbac_roles(self):
+    def test_stream_enforces_channel_rbac_roles(self) -> None:
         cp = ControlPlane(
             auth_token="claims-token",
             auth_claims={"roles": ["viewer"]},
@@ -488,7 +488,7 @@ class TestControlPlane:
 
         try:
             urllib.request.urlopen(f"{url}/api/stream?channel=dag&once=1&token=claims-token")
-            assert False, "Expected forbidden"
+            raise AssertionError("Expected forbidden")
         except urllib.error.HTTPError as exc:
             assert exc.code == 403
 

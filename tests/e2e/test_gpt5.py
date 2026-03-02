@@ -228,7 +228,7 @@ class TestGPT5Features:
 
     def test_structured_output(self) -> None:
         from gauss import Agent, AgentConfig
-        from gauss.structured import structured, StructuredConfig
+        from gauss.structured import structured
 
         start = time.time()
         with Agent(AgentConfig(

@@ -12,13 +12,11 @@ from __future__ import annotations
 
 import json
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 import pytest
-
 from gauss import Agent, AgentConfig, Graph, Network, ProviderType, Team, Workflow
-
 
 # ── Mock OpenAI Server ───────────────────────────────────────────────────────
 

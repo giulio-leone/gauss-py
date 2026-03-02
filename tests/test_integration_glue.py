@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import json
 import sys
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from gauss.tool import tool, TypedToolDef, create_tool_executor
-from gauss.mcp_client import McpClient, McpClientConfig
+import pytest
+from gauss.mcp_client import McpClientConfig
+from gauss.tool import TypedToolDef, create_tool_executor, tool
 
 # ── Mock native module before importing Agent ────────────────────────
 _mock_native = MagicMock()
@@ -41,11 +41,10 @@ def _patch_native(monkeypatch: pytest.MonkeyPatch) -> None:
 
 from gauss.agent import Agent
 
-
 # ─── M36: @tool decorator ────────────────────────────────────────────
 
 class TestToolDecorator:
-    def test_creates_typed_tool_from_function(self):
+    def test_creates_typed_tool_from_function(self) -> None:
         @tool
         def search(query: str, limit: int = 10) -> dict:
             """Search the web for results."""
@@ -61,16 +60,16 @@ class TestToolDecorator:
         assert props["limit"]["type"] == "integer"
         assert props["limit"]["default"] == 10
 
-    def test_extracts_name_and_description(self):
+    def test_extracts_name_and_description(self) -> None:
         @tool
-        def my_tool():
+        def my_tool() -> None:
             """This is the description."""
             pass
 
         assert my_tool.name == "my_tool"
         assert my_tool.description == "This is the description."
 
-    def test_tool_with_custom_name(self):
+    def test_tool_with_custom_name(self) -> None:
         @tool(name="custom_name", description="Custom desc")
         def helper(x: int) -> str:
             return str(x)
@@ -78,7 +77,7 @@ class TestToolDecorator:
         assert helper.name == "custom_name"
         assert helper.description == "Custom desc"
 
-    def test_tool_execute_works(self):
+    def test_tool_execute_works(self) -> None:
         @tool
         def add(a: int, b: int) -> int:
             """Add two numbers."""
@@ -87,7 +86,7 @@ class TestToolDecorator:
         result = add.execute(a=2, b=3)
         assert result == 5
 
-    def test_tool_callable(self):
+    def test_tool_callable(self) -> None:
         @tool
         def multiply(x: int, y: int) -> int:
             """Multiply."""
@@ -96,7 +95,7 @@ class TestToolDecorator:
         # Should still be callable directly
         assert multiply(x=3, y=4) == 12
 
-    def test_type_mapping(self):
+    def test_type_mapping(self) -> None:
         @tool
         def complex_fn(s: str, i: int, f: float, b: bool) -> None:
             """Test types."""
@@ -108,14 +107,14 @@ class TestToolDecorator:
         assert props["f"]["type"] == "number"
         assert props["b"]["type"] == "boolean"
 
-    def test_no_docstring_gives_empty_description(self):
+    def test_no_docstring_gives_empty_description(self) -> None:
         @tool
         def no_docs(x: int) -> int:
             return x
 
         assert no_docs.description == ""
 
-    def test_to_dict_excludes_execute(self):
+    def test_to_dict_excludes_execute(self) -> None:
         @tool
         def fn(x: str) -> str:
             """Test."""
@@ -131,7 +130,7 @@ class TestToolDecorator:
 # ─── M36: create_tool_executor ───────────────────────────────────────
 
 class TestCreateToolExecutor:
-    def test_dispatches_to_correct_tool(self):
+    def test_dispatches_to_correct_tool(self) -> None:
         @tool
         def add(a: int, b: int) -> dict:
             """Add."""
@@ -149,12 +148,12 @@ class TestCreateToolExecutor:
         result = executor(json.dumps({"tool": "sub", "args": {"a": 5, "b": 3}}))
         assert json.loads(result) == {"diff": 2}
 
-    def test_unknown_tool_returns_error(self):
+    def test_unknown_tool_returns_error(self) -> None:
         executor = create_tool_executor([])
         result = executor(json.dumps({"tool": "unknown", "args": {}}))
         assert "error" in json.loads(result)
 
-    def test_execute_error_returns_error(self):
+    def test_execute_error_returns_error(self) -> None:
         @tool
         def failing(x: int) -> int:
             """Fail."""
@@ -166,7 +165,7 @@ class TestCreateToolExecutor:
         assert "error" in parsed
         assert "boom" in parsed["error"]
 
-    def test_string_return_from_execute(self):
+    def test_string_return_from_execute(self) -> None:
         @tool
         def echo(msg: str) -> str:
             """Echo."""
@@ -176,7 +175,7 @@ class TestCreateToolExecutor:
         result = executor(json.dumps({"tool": "echo", "args": {"msg": "hello"}}))
         assert result == "hello"
 
-    def test_fallback_for_unmatched(self):
+    def test_fallback_for_unmatched(self) -> None:
         @tool
         def t1(x: int) -> int:
             """Test."""
@@ -192,7 +191,7 @@ class TestCreateToolExecutor:
 # ─── M35: Agent integration methods ─────────────────────────────────
 
 class TestAgentWithMiddleware:
-    def test_with_middleware_returns_self(self):
+    def test_with_middleware_returns_self(self) -> None:
         agent = Agent(api_key="sk-test-key")
         middleware = MagicMock()
 
@@ -200,7 +199,7 @@ class TestAgentWithMiddleware:
 
         assert result is agent  # chainable
 
-    def test_with_guardrails_returns_self(self):
+    def test_with_guardrails_returns_self(self) -> None:
         agent = Agent(api_key="sk-test-key")
         guardrails = MagicMock()
 
@@ -208,7 +207,7 @@ class TestAgentWithMiddleware:
 
         assert result is agent
 
-    def test_with_memory_returns_self(self):
+    def test_with_memory_returns_self(self) -> None:
         agent = Agent(api_key="sk-test-key")
         memory = MagicMock()
 
@@ -218,7 +217,7 @@ class TestAgentWithMiddleware:
 
 
 class TestAgentWithTypedTools:
-    def test_typed_tools_use_tool_executor_run(self):
+    def test_typed_tools_use_tool_executor_run(self) -> None:
         @tool
         def calc(expr: str) -> dict:
             """Calculate."""
@@ -227,11 +226,11 @@ class TestAgentWithTypedTools:
         agent = Agent(api_key="sk-test-key")
         agent.add_tool(calc)
 
-        result = agent.run("Calculate 6*7")
+        agent.run("Calculate 6*7")
 
         _mock_native.agent_run_with_tool_executor.assert_called_once()
 
-    def test_tool_defs_sent_without_execute(self):
+    def test_tool_defs_sent_without_execute(self) -> None:
         @tool
         def greet(name: str) -> str:
             """Greet."""
@@ -248,7 +247,7 @@ class TestAgentWithTypedTools:
 
 
 class TestAgentWithMemory:
-    def test_memory_recall_before_run(self):
+    def test_memory_recall_before_run(self) -> None:
         memory = MagicMock()
         memory.recall.return_value = [
             {"id": "1", "content": "User likes cats", "entryType": "fact", "timestamp": "2024-01-01"}
@@ -262,7 +261,7 @@ class TestAgentWithMemory:
 
         memory.recall.assert_called_once()
 
-    def test_memory_store_after_run(self):
+    def test_memory_store_after_run(self) -> None:
         memory = MagicMock()
         memory.recall.return_value = []
         memory._handle = 99
@@ -279,7 +278,7 @@ class TestAgentWithMemory:
 # ─── M37: McpClient config ──────────────────────────────────────────
 
 class TestMcpClientConfig:
-    def test_config_creation(self):
+    def test_config_creation(self) -> None:
         config = McpClientConfig(
             command="npx",
             args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
@@ -287,7 +286,7 @@ class TestMcpClientConfig:
         assert config.command == "npx"
         assert config.args == ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 
-    def test_agent_use_mcp_server(self):
+    def test_agent_use_mcp_server(self) -> None:
         agent = Agent(api_key="sk-test-key")
 
         config = McpClientConfig(command="echo", args=["test"])

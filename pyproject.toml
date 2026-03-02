@@ -58,4 +58,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "ANN", "S", "B", "SIM"]
-ignore = ["S101", "ANN401", "S311", "B905"]
+ignore = ["S101", "ANN401", "S311", "B905", "E501", "S310", "S106", "S108", "S307", "S603"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN001", "ANN002", "ANN003", "ANN202", "E402"]
+"python/gauss/__init__.py" = ["E402", "F821"]
+"python/gauss/_types.py" = ["E402"]

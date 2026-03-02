@@ -20,9 +20,9 @@ from gauss._types import (
     GeneratedImageData,
     ImageGenerationResult,
     ProviderType,
+    _default_model,
     detect_provider,
     resolve_api_key,
-    _default_model,
 )
 
 
@@ -175,6 +175,8 @@ def generate_image(
     from gauss._native import (
         create_provider,
         destroy_provider,
+    )
+    from gauss._native import (
         generate_image as _gen_image,
     )
 
