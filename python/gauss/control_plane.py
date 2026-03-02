@@ -793,6 +793,7 @@ class ControlPlane:
             "promoted_at": version.get("promoted_at"),
             "has_validation": version.get("validation") is not None,
             "validation": version.get("validation"),
+            "audit": version.get("audit"),
         }
 
     def _find_policy_lifecycle_version(self, version_id: str) -> dict[str, Any]:
@@ -801,13 +802,66 @@ class ControlPlane:
                 return item
         raise ValidationError(f'Unknown lifecycle version "{version_id}"', "version")
 
+    def _resolve_lifecycle_actor(
+        self,
+        params: dict[str, list[str]],
+        *,
+        action: str,
+        allowed_roles: list[str],
+    ) -> tuple[str, str | None, str | None]:
+        requested_role_raw = params.get("role", [None])[0]
+        requested_role = str(requested_role_raw or "").strip().lower() or None
+
+        claim_roles = [
+            str(role).strip().lower()
+            for role in (self._auth_claims.get("roles") or [])
+            if str(role).strip()
+        ]
+        if claim_roles:
+            if requested_role is not None and requested_role not in claim_roles:
+                raise _ControlPlaneForbiddenError(f'Forbidden lifecycle role "{requested_role}"')
+            if requested_role is not None and requested_role not in allowed_roles:
+                raise _ControlPlaneForbiddenError(f'Forbidden lifecycle action "{action}"')
+            effective_role = requested_role
+            if effective_role is None:
+                effective_role = next((role for role in claim_roles if role in allowed_roles), None)
+            if effective_role is None:
+                raise _ControlPlaneForbiddenError(f'Forbidden lifecycle action "{action}"')
+        else:
+            if requested_role is not None and requested_role not in allowed_roles:
+                raise _ControlPlaneForbiddenError(f'Forbidden lifecycle action "{action}"')
+            effective_role = requested_role or allowed_roles[0]
+
+        actor = str(params.get("actor", [None])[0] or "").strip() or None
+        comment = str(params.get("comment", [None])[0] or "").strip() or None
+        return effective_role, actor, comment
+
+    def _merge_lifecycle_audit(self, version: dict[str, Any], **fields: Any) -> None:
+        audit = version.get("audit")
+        if not isinstance(audit, dict):
+            audit = {}
+            version["audit"] = audit
+        for key, value in fields.items():
+            if value is not None:
+                audit[key] = value
+
     def _ops_policy_lifecycle_draft(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        role, actor, comment = self._resolve_lifecycle_actor(
+            params,
+            action="draft",
+            allowed_roles=["author", "operator", "admin"],
+        )
         version = {
             "version_id": f"policy-v{self._next_policy_lifecycle_version}",
             "status": "draft",
             "created_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
             "policy": deepcopy(self._parse_policy_lifecycle_policy(params)),
             "validation": None,
+            "audit": {
+                "drafted_by_role": role,
+                "drafted_by": actor,
+                "draft_comment": comment,
+            },
         }
         self._next_policy_lifecycle_version += 1
         self._policy_lifecycle_versions.append(version)
@@ -816,6 +870,11 @@ class ControlPlane:
     def _ops_policy_lifecycle_validate(self, params: dict[str, list[str]]) -> dict[str, Any]:
         from gauss.routing_policy import evaluate_policy_gate
 
+        role, actor, comment = self._resolve_lifecycle_actor(
+            params,
+            action="validate",
+            allowed_roles=["author", "reviewer", "operator", "admin"],
+        )
         version_id = params.get("version", [None])[0]
         if version_id is None or version_id == "":
             raise ValidationError("Missing version query parameter", "version")
@@ -827,6 +886,12 @@ class ControlPlane:
         ]
         validation = evaluate_policy_gate(version["policy"], gate_scenarios)
         version["validation"] = validation
+        self._merge_lifecycle_audit(
+            version,
+            validated_by_role=role,
+            validated_by=actor,
+            validation_comment=comment,
+        )
         if int(validation.get("failed", 0)) == 0:
             version["status"] = "validated"
             version["validated_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
@@ -837,6 +902,11 @@ class ControlPlane:
         }
 
     def _ops_policy_lifecycle_approve(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        role, actor, comment = self._resolve_lifecycle_actor(
+            params,
+            action="approve",
+            allowed_roles=["reviewer", "operator", "admin"],
+        )
         version_id = params.get("version", [None])[0]
         if version_id is None or version_id == "":
             raise ValidationError("Missing version query parameter", "version")
@@ -850,9 +920,20 @@ class ControlPlane:
             }
         version["status"] = "approved"
         version["approved_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        self._merge_lifecycle_audit(
+            version,
+            approved_by_role=role,
+            approved_by=actor,
+            approval_comment=comment,
+        )
         return {"ok": True, "version": self._summarize_policy_lifecycle_version(version)}
 
     def _ops_policy_lifecycle_promote(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        role, actor, comment = self._resolve_lifecycle_actor(
+            params,
+            action="promote",
+            allowed_roles=["promoter", "operator", "admin"],
+        )
         version_id = params.get("version", [None])[0]
         if version_id is None or version_id == "":
             raise ValidationError("Missing version query parameter", "version")
@@ -869,6 +950,12 @@ class ControlPlane:
                 item["status"] = "approved"
         version["status"] = "promoted"
         version["promoted_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        self._merge_lifecycle_audit(
+            version,
+            promoted_by_role=role,
+            promoted_by=actor,
+            promotion_comment=comment,
+        )
         self._active_policy_version_id = version_id
         self._routing_policy = deepcopy(version["policy"])
         return {
@@ -1281,6 +1368,7 @@ class ControlPlane:
             "supports_policy_explain_traces": True,
             "supports_policy_explain_diff": True,
             "supports_policy_lifecycle": True,
+            "supports_policy_lifecycle_rbac": True,
             "supports_policy_drift_monitoring": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
@@ -1290,6 +1378,13 @@ class ControlPlane:
             "policy_explain_trace_path": "/api/ops/policy/explain/traces",
             "policy_explain_diff_path": "/api/ops/policy/explain/diff",
             "policy_lifecycle_base_path": "/api/ops/policy/lifecycle",
+            "policy_lifecycle_role_param": "role",
+            "policy_lifecycle_audit_fields": [
+                "drafted_by_role",
+                "validated_by_role",
+                "approved_by_role",
+                "promoted_by_role",
+            ],
             "policy_drift_path": "/api/ops/policy/drift",
         }
 

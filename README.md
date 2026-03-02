@@ -249,10 +249,10 @@ print(explanation["decision"]["selected_by"])  # "direct" | "alias:..." | "fallb
 # Optional rollout guardrails (diff + thresholds):
 # python -m gauss.policy_gate ./scenarios.json ./candidate-policy.json ./baseline-policy.json ./guardrails.json
 # Policy lifecycle APIs:
-# GET /api/ops/policy/lifecycle/draft?policy=<json>
-# GET /api/ops/policy/lifecycle/validate?version=policy-v1&scenarios=<json>
-# GET /api/ops/policy/lifecycle/approve?version=policy-v1
-# GET /api/ops/policy/lifecycle/promote?version=policy-v1
+# GET /api/ops/policy/lifecycle/draft?policy=<json>&role=author&actor=<id>&comment=<text>
+# GET /api/ops/policy/lifecycle/validate?version=policy-v1&scenarios=<json>&role=author|reviewer
+# GET /api/ops/policy/lifecycle/approve?version=policy-v1&role=reviewer|operator|admin
+# GET /api/ops/policy/lifecycle/promote?version=policy-v1&role=promoter|operator|admin
 # GET /api/ops/policy/lifecycle/versions
 # Policy drift monitoring:
 # GET /api/ops/policy/drift?scenarios=<json>&candidatePolicy=<json>&maxRegressions=0

@@ -77,6 +77,7 @@ class TestControlPlane:
             assert caps["supports_policy_explain_traces"] is True
             assert caps["supports_policy_explain_diff"] is True
             assert caps["supports_policy_lifecycle"] is True
+            assert caps["supports_policy_lifecycle_rbac"] is True
             assert caps["supports_policy_drift_monitoring"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
@@ -86,6 +87,8 @@ class TestControlPlane:
             assert caps["policy_explain_trace_path"] == "/api/ops/policy/explain/traces"
             assert caps["policy_explain_diff_path"] == "/api/ops/policy/explain/diff"
             assert caps["policy_lifecycle_base_path"] == "/api/ops/policy/lifecycle"
+            assert caps["policy_lifecycle_role_param"] == "role"
+            assert "approved_by_role" in caps["policy_lifecycle_audit_fields"]
             assert caps["policy_drift_path"] == "/api/ops/policy/drift"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
@@ -225,6 +228,68 @@ class TestControlPlane:
         with urllib.request.urlopen(f"{url}/ops/tenants") as resp:
             html = resp.read().decode("utf-8")
             assert "Gauss Hosted Tenant Ops" in html
+
+        cp.stop_server()
+
+    def test_policy_lifecycle_enforces_rbac_roles_and_audit_metadata(self):
+        cp = ControlPlane(
+            auth_token="claims-token",
+            auth_claims={"roles": ["author"]},
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+        )
+        url = cp.start_server(port=0)
+        policy = urllib.parse.quote(json.dumps({}))
+        scenarios = urllib.parse.quote(json.dumps([{"provider": "openai", "model": "gpt-5.2"}]))
+
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/lifecycle/draft?token=claims-token&role=author&actor=alice&comment=draft&policy={policy}"
+        ) as resp:
+            draft = json.loads(resp.read().decode("utf-8"))
+            version_id = draft["version"]["version_id"]
+            assert draft["version"]["audit"]["drafted_by_role"] == "author"
+            assert draft["version"]["audit"]["drafted_by"] == "alice"
+
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/lifecycle/validate?token=claims-token&version={version_id}&role=author&scenarios={scenarios}"
+        ) as resp:
+            validated = json.loads(resp.read().decode("utf-8"))
+            assert validated["ok"] is True
+            assert validated["version"]["audit"]["validated_by_role"] == "author"
+
+        try:
+            urllib.request.urlopen(
+                f"{url}/api/ops/policy/lifecycle/approve?token=claims-token&version={version_id}&role=author"
+            )
+            assert False, "Expected forbidden"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
+
+        cp.with_auth_claims({"roles": ["reviewer"]})
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/lifecycle/approve?token=claims-token&version={version_id}&role=reviewer&actor=bob"
+        ) as resp:
+            approved = json.loads(resp.read().decode("utf-8"))
+            assert approved["ok"] is True
+            assert approved["version"]["audit"]["approved_by_role"] == "reviewer"
+            assert approved["version"]["audit"]["approved_by"] == "bob"
+
+        try:
+            urllib.request.urlopen(
+                f"{url}/api/ops/policy/lifecycle/promote?token=claims-token&version={version_id}&role=reviewer"
+            )
+            assert False, "Expected forbidden"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
+
+        cp.with_auth_claims({"roles": ["promoter"]})
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/lifecycle/promote?token=claims-token&version={version_id}&role=promoter&comment=ready"
+        ) as resp:
+            promoted = json.loads(resp.read().decode("utf-8"))
+            assert promoted["ok"] is True
+            assert promoted["version"]["audit"]["promoted_by_role"] == "promoter"
+            assert promoted["version"]["audit"]["promotion_comment"] == "ready"
 
         cp.stop_server()
 
