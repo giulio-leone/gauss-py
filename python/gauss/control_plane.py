@@ -75,6 +75,9 @@ class ControlPlane:
         self._history: list[dict[str, Any]] = []
         self._next_stream_event_id = 1
         self._stream_events: list[dict[str, Any]] = []
+        self._next_explain_trace_id = 1
+        self._explain_traces: list[dict[str, Any]] = []
+        self._latest_explain_trace_id: str | None = None
         self._server: ThreadingHTTPServer | None = None
         self._server_thread: Thread | None = None
 
@@ -141,6 +144,7 @@ class ControlPlane:
                     "span_count": len(spans) if isinstance(spans, list) else 0,
                     "pending_approvals_count": len(pending) if isinstance(pending, list) else 0,
                     "total_cost_usd": float((latest_cost or {}).get("total_cost_usd", 0.0)),
+                    "latest_explain_trace_id": item.get("latest_explain_trace_id"),
                 }
             )
         return out
@@ -254,6 +258,11 @@ class ControlPlane:
 
                     if parsed.path == "/api/ops/policy/explain/simulate":
                         payload = json.dumps(outer._ops_policy_explain_simulation(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/explain/traces":
+                        payload = json.dumps(outer._ops_policy_explain_traces(params), indent=2).encode("utf-8")
                         self._send_json(payload)
                         return
 
@@ -394,6 +403,7 @@ class ControlPlane:
             "metrics": self._telemetry.export_metrics() if self._telemetry else {},
             "pending_approvals": self._approvals.list_pending() if self._approvals else [],
             "latest_cost": self._latest_cost.__dict__ if self._latest_cost is not None else None,
+            "latest_explain_trace_id": self._latest_explain_trace_id,
         }
         self._history.append(item)
         if len(self._history) > self._history_limit:
@@ -548,7 +558,7 @@ class ControlPlane:
         from gauss.routing_policy import explain_routing_target
 
         provider, model, options = self._parse_policy_explain_options(params)
-        return explain_routing_target(
+        explanation = explain_routing_target(
             self._routing_policy,
             provider,
             model,
@@ -558,11 +568,27 @@ class ControlPlane:
             current_hour_utc=options["current_hour_utc"],
             governance_tags=options["governance_tags"],
         )
+        trace = self._record_policy_explain_trace(
+            "single",
+            {
+                "input": {"provider": provider.value, "model": model, "options": options},
+                "explanation": explanation,
+            },
+        )
+        return {**explanation, "trace_id": trace["trace_id"]}
 
     def _ops_policy_explain_batch(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        scenarios = self._parse_policy_explain_batch_scenarios(params)
+        response = self._build_policy_explain_batch_response(scenarios)
+        trace = self._record_policy_explain_trace("batch", response)
+        return {**response, "trace_id": trace["trace_id"]}
+
+    def _build_policy_explain_batch_response(
+        self,
+        scenarios: list[tuple[ProviderType, str, dict[str, Any]]],
+    ) -> dict[str, Any]:
         from gauss.routing_policy import explain_routing_target
 
-        scenarios = self._parse_policy_explain_batch_scenarios(params)
         results: list[dict[str, Any]] = []
         for index, (provider, model, options) in enumerate(scenarios):
             explanation = explain_routing_target(
@@ -593,7 +619,33 @@ class ControlPlane:
         }
 
     def _ops_policy_explain_simulation(self, params: dict[str, list[str]]) -> dict[str, Any]:
-        return self._ops_policy_explain_batch(params)
+        scenarios = self._parse_policy_explain_batch_scenarios(params)
+        response = self._build_policy_explain_batch_response(scenarios)
+        trace = self._record_policy_explain_trace("simulate", response)
+        return {**response, "trace_id": trace["trace_id"]}
+
+    def _record_policy_explain_trace(self, mode: str, payload: dict[str, Any]) -> dict[str, Any]:
+        trace = {
+            "trace_id": f"trace-{self._next_explain_trace_id}",
+            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "mode": mode,
+            "payload": payload,
+        }
+        self._next_explain_trace_id += 1
+        self._latest_explain_trace_id = str(trace["trace_id"])
+        self._explain_traces.append(trace)
+        if len(self._explain_traces) > self._history_limit:
+            self._explain_traces.pop(0)
+        return trace
+
+    def _ops_policy_explain_traces(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        trace_id = params.get("traceId", [None])[0]
+        traces = (
+            [trace for trace in self._explain_traces if trace.get("trace_id") == trace_id]
+            if trace_id
+            else list(self._explain_traces)
+        )
+        return {"total": len(traces), "traces": traces}
 
     def _parse_stream_channel(self, channel: str | None) -> str:
         if channel is None:
@@ -814,11 +866,13 @@ class ControlPlane:
             "supports_ops_tenants": True,
             "supports_policy_explain": True,
             "supports_policy_explain_batch": True,
+            "supports_policy_explain_traces": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
             "policy_explain_path": "/api/ops/policy/explain",
             "policy_explain_batch_path": "/api/ops/policy/explain/batch",
             "policy_explain_simulate_path": "/api/ops/policy/explain/simulate",
+            "policy_explain_trace_path": "/api/ops/policy/explain/traces",
         }
 
     def _ops_health(self) -> dict[str, Any]:

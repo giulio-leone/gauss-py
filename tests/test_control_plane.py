@@ -74,11 +74,13 @@ class TestControlPlane:
             assert caps["supports_ops_tenants"] is True
             assert caps["supports_policy_explain"] is True
             assert caps["supports_policy_explain_batch"] is True
+            assert caps["supports_policy_explain_traces"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
             assert caps["policy_explain_path"] == "/api/ops/policy/explain"
             assert caps["policy_explain_batch_path"] == "/api/ops/policy/explain/batch"
             assert caps["policy_explain_simulate_path"] == "/api/ops/policy/explain/simulate"
+            assert caps["policy_explain_trace_path"] == "/api/ops/policy/explain/traces"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -100,6 +102,7 @@ class TestControlPlane:
         with urllib.request.urlopen(f"{url}/api/ops/policy/explain?provider=openai&model=gpt-5.2&hour=10") as resp:
             explain = json.loads(resp.read().decode("utf-8"))
             assert explain["ok"] is True
+            assert str(explain["trace_id"]).startswith("trace-")
             assert explain["decision"]["provider"] == "openai"
             assert explain["decision"]["selected_by"] == "direct"
             assert any(item["check"] == "selection" and item["status"] == "passed" for item in explain["checks"])
@@ -115,6 +118,7 @@ class TestControlPlane:
         with urllib.request.urlopen(f"{url}/api/ops/policy/explain/batch?scenarios={scenarios}") as resp:
             batch = json.loads(resp.read().decode("utf-8"))
             assert batch["ok"] is True
+            assert str(batch["trace_id"]).startswith("trace-")
             assert batch["total"] == 2
             assert batch["passed"] == 1
             assert batch["failed"] == 1
@@ -123,9 +127,17 @@ class TestControlPlane:
 
         with urllib.request.urlopen(f"{url}/api/ops/policy/explain/simulate?scenarios={scenarios}") as resp:
             simulation = json.loads(resp.read().decode("utf-8"))
+            assert str(simulation["trace_id"]).startswith("trace-")
             assert simulation["total"] == 2
             assert simulation["passed"] == 1
             assert simulation["failed"] == 1
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/explain/traces") as resp:
+            traces = json.loads(resp.read().decode("utf-8"))
+            assert traces["total"] >= 3
+            assert any(item["mode"] == "single" for item in traces["traces"])
+            assert any(item["mode"] == "batch" for item in traces["traces"])
+            assert any(item["mode"] == "simulate" for item in traces["traces"])
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")
