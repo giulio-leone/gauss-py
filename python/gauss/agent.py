@@ -162,6 +162,23 @@ class Agent:
         )
         self._model = model
 
+    @classmethod
+    def from_env(cls, **kwargs: Any) -> Agent:
+        """Create an agent using environment auto-detection with optional overrides.
+
+        This helper is equivalent to ``Agent(**kwargs)`` and is provided for
+        readability in quick-start flows.
+
+        Args:
+            **kwargs: Forwarded to :class:`AgentConfig`.
+
+        Returns:
+            A new :class:`Agent` instance.
+
+        .. versionadded:: 2.1.0
+        """
+        return cls(**kwargs)
+
     # ── Execution ──────────────────────────────────────────────────────
 
     def run(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentResult:
@@ -437,6 +454,47 @@ class Agent:
             usage=data.get("usage", {}),
         )
 
+    def stream_text(
+        self,
+        prompt: str | Sequence[Message | dict[str, str]],
+        on_delta: Callable[[str], None] | None = None,
+    ) -> str:
+        """Stream text deltas with a minimal helper and return final text.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+            on_delta: Optional callback invoked for each text delta chunk.
+
+        Returns:
+            The final aggregated text response.
+
+        .. versionadded:: 2.1.0
+        """
+        chunks: list[str] = []
+
+        def _on_event(event_json: str) -> None:
+            try:
+                event = json.loads(event_json)
+            except json.JSONDecodeError:
+                return
+            if event.get("type") != "text_delta":
+                return
+
+            delta = event.get("text")
+            if not isinstance(delta, str):
+                delta = event.get("delta")
+            if not isinstance(delta, str):
+                delta = event.get("data")
+            if not isinstance(delta, str):
+                return
+
+            chunks.append(delta)
+            if on_delta is not None:
+                on_delta(delta)
+
+        result = self.stream(prompt, _on_event)
+        return result.text or "".join(chunks)
+
     def generate_with_tools(
         self,
         prompt: str | Sequence[Message | dict[str, str]],
@@ -616,6 +674,39 @@ class Agent:
             if hasattr(self._config, key):
                 setattr(self._config, key, value)
         return self
+
+    def with_model(self, model: str) -> Agent:
+        """Clone this agent with a different model while preserving integrations.
+
+        Args:
+            model: Target model identifier.
+
+        Returns:
+            A new :class:`Agent` instance configured with ``model``.
+
+        .. versionadded:: 2.1.0
+        """
+        from dataclasses import replace
+
+        self._check_alive()
+        provider, _, api_key = self._config.resolve()
+        config = replace(
+            self._config,
+            provider=provider,
+            model=model,
+            api_key=api_key,
+            tools=list(self._tools),
+        )
+        clone = Agent(config)
+        if self._middleware is not None:
+            clone.with_middleware(self._middleware)
+        if self._guardrails is not None:
+            clone.with_guardrails(self._guardrails)
+        if self._memory is not None:
+            clone.with_memory(self._memory, self._session_id)
+        for client in self._mcp_clients:
+            clone.use_mcp_server(client)
+        return clone
 
     # ── Integration Glue (M35) ────────────────────────────────────────
 

@@ -200,6 +200,41 @@ class TestAgent:
         answer = gauss("What is life?")
         assert answer == "The answer is 42"
 
+    def test_from_env_helper(self) -> None:
+        from gauss.agent import Agent
+        agent = Agent.from_env(name="env-agent")
+        assert agent is not None
+        assert agent._config.name == "env-agent"
+        agent.destroy()
+
+    def test_with_model_clones_agent(self) -> None:
+        from gauss.agent import Agent
+        agent = Agent(model="gpt-4.1")
+        clone = agent.with_model("gpt-5.2")
+        assert clone is not agent
+        assert clone._model == "gpt-5.2"
+        assert agent._model == "gpt-4.1"
+        agent.destroy()
+        clone.destroy()
+
+    def test_stream_text_aggregates_deltas(self) -> None:
+        from gauss._types import AgentResult
+        from gauss.agent import Agent
+
+        agent = Agent()
+
+        def fake_stream(_prompt, callback):
+            callback('{"type":"text_delta","text":"Hello"}')
+            callback('{"type":"text_delta","delta":" World"}')
+            return AgentResult(text="Hello World", messages=[], tool_calls=[], usage={})
+
+        chunks: list[str] = []
+        with patch.object(agent, "stream", side_effect=fake_stream):
+            text = agent.stream_text("Hi", on_delta=chunks.append)
+        assert text == "Hello World"
+        assert chunks == ["Hello", " World"]
+        agent.destroy()
+
 
 # ===========================================================================
 # Memory Tests

@@ -2,263 +2,256 @@
 
 # 🔮 gauss-py
 
-**The AI Agent SDK for Python — powered by Rust**
+### Rust-powered AI Agent SDK for Python
 
 [![CI](https://github.com/giulio-leone/gauss-py/actions/workflows/ci.yml/badge.svg)](https://github.com/giulio-leone/gauss-py/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/gauss-py.svg)](https://pypi.org/project/gauss-py/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Multi-provider • Teams • Tools • MCP • Graphs • Workflows • Memory • RAG**
+**Rust-powered • Multi-provider • Enterprise-grade • Plug-and-play DX**
 
 </div>
 
+Gauss gives Python developers a production-grade agent API on top of a native Rust engine.
+Build single agents, hierarchical teams, DAG pipelines, MCP/A2A systems, and enterprise workflows with minimal boilerplate.
+
 ---
 
-## Quick Start
+## Install
 
 ```bash
 pip install gauss-py
 ```
 
-```python
-from gauss import Agent
+Set one provider key (auto-detection is built in):
 
-agent = Agent(
-    name="assistant",
-    model="gpt-5.2",
-    instructions="You are a helpful assistant.",
-)
-
-result = await agent.run("What is quantum computing?")
-print(result.text)
+```bash
+export OPENAI_API_KEY=sk-...
+# or ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY / ...
 ```
 
-## Features
+---
 
-### 🤖 Agents
+## Quick Start
+
+### One-liner
+
+```python
+from gauss import gauss
+
+print(gauss("Explain retrieval-augmented generation in 3 bullets."))
+```
+
+### Full control
 
 ```python
 from gauss import Agent, OPENAI_DEFAULT
 
 agent = Agent(
-    name="researcher",
+    name="assistant",
     model=OPENAI_DEFAULT,  # "gpt-5.2"
-    instructions="You are a research assistant.",
-    temperature=0.7,
-    max_steps=5,
+    system_prompt="You are a concise senior engineer.",
+    temperature=0.2,
 )
 
-result = await agent.run("Find the population of Tokyo")
-print(f"{result.text}")
-print(f"Steps: {result.steps}, Tokens: {result.input_tokens + result.output_tokens}")
-
-# Stream
-async for event in agent.stream("Tell me a story"):
-    if event.type == "text_delta":
-        print(event.delta, end="")
+result = agent.run("Design a clean API for a weather service.")
+print(result.text)
+agent.destroy()
 ```
 
-### 🛠️ Tools
+> `run()` is synchronous.
+> Use `await agent.arun(...)` for async execution.
+
+---
+
+## Multi-Agent in a Few Lines
+
+### 1) Team.quick() (hierarchical team bootstrap)
 
 ```python
-from gauss import Agent, ToolDef
+from gauss import Team
 
-weather_tool = ToolDef(
-    name="get_weather",
-    description="Get current weather for a location",
-    parameters={
-        "type": "object",
-        "properties": {
-            "city": {"type": "string", "description": "City name"},
+team = Team.quick("architecture-team", "parallel", [
+    {"name": "planner", "instructions": "Break work into milestones."},
+    {"name": "implementer", "instructions": "Produce production-ready code."},
+    {"name": "reviewer", "instructions": "Find defects and risks."},
+])
+
+out = team.run("Implement a resilient webhook ingestion service.")
+print(out["finalText"])
+team.destroy()
+```
+
+### 2) Graph.pipeline() (2-line DAG)
+
+```python
+from gauss import Agent, Graph
+
+graph = Graph.pipeline([
+    {"node_id": "analyze", "agent": Agent(system_prompt="Analyze requirements")},
+    {"node_id": "build", "agent": Agent(system_prompt="Implement solution")},
+    {"node_id": "verify", "agent": Agent(system_prompt="Validate outputs")},
+])
+
+out = graph.run("Build a typed SDK wrapper around a REST API.")
+print(out["final_text"])
+graph.destroy()
+```
+
+---
+
+## Agent DX
+
+### Inline tools with `with_tool()`
+
+```python
+from gauss import Agent
+
+agent = (
+    Agent(system_prompt="Use tools when useful.")
+    .with_tool(
+        "sum",
+        "Sum two numbers",
+        {
+            "type": "object",
+            "properties": {
+                "a": {"type": "number"},
+                "b": {"type": "number"},
+            },
+            "required": ["a", "b"],
         },
-        "required": ["city"],
-    },
-    handler=lambda args: {"temperature": 22, "condition": "sunny"},
+        execute=lambda a, b: str(a + b),
+    )
 )
 
-agent = Agent(
-    name="weather-bot",
-    model="gpt-5.2",
-    tools=[weather_tool],
-)
+out = agent.run("What is 12 + 30?")
+print(out.text)
+agent.destroy()
 ```
 
-### 👥 Teams
+### Streaming helpers
 
 ```python
-from gauss import Agent, Team
+# Event stream (async iterable)
+stream = agent.stream_iter("Write a short release note")
 
-team = Team(
-    name="research-team",
-    agents=[
-        Agent(name="researcher", model="gpt-5.2", instructions="Research deeply."),
-        Agent(name="writer", model="claude-sonnet-4-20250514", instructions="Write clearly."),
-        Agent(name="critic", model="gemini-2.5-flash", instructions="Review and critique."),
-    ],
-    strategy="round-robin",
-)
-
-result = await team.run("Analyze the impact of AI on healthcare")
+# Minimal DX helper: callback + final text
+chunks = []
+text = agent.stream_text("Write a changelog", on_delta=chunks.append)
+print(text)
 ```
 
-### 🧠 Memory
+### Config helpers
 
 ```python
-from gauss import Agent, Memory
+# Explicit env-intent constructor
+agent = Agent.from_env(system_prompt="Be precise.")
 
-memory = Memory()
-agent = Agent(name="assistant", model="gpt-5.2", memory=memory)
-
-await agent.run("My name is Alice and I love hiking.")
-result = await agent.run("What do you know about me?")
-# → "You're Alice, and you enjoy hiking!"
+# Clone with a different model
+fast_agent = agent.with_model("gpt-4.1")
 ```
 
-### 🔗 MCP Server
+### Async API
 
 ```python
-from gauss import McpServer
+# run() is sync
+result = agent.run("sync call")
 
-server = McpServer("my-tools", "1.0.0")
-server.add_tool(
-    name="calculate",
-    description="Evaluate a math expression",
-    parameters={"type": "object", "properties": {"expr": {"type": "string"}}},
-    handler=lambda args: {"result": eval(args["expr"])},
-)
+# async variants
+result_async = await agent.arun("async call")
+text_async = await agent.agenerate("write a haiku")
 ```
 
-### 📊 Graph Pipelines
+---
 
-```python
-from gauss import Graph, Agent
+## Core Features
 
-graph = Graph("content-pipeline")
-graph.add_node("research", research_agent)
-graph.add_node("write", writer_agent)
-graph.add_node("review", review_agent)
-graph.add_edge("research", "write")
-graph.add_edge("write", "review")
+- **Agents**: `Agent`, `gauss()`
+- **Teams**: `Team`, `Team.quick()`
+- **Graphs**: `Graph`, `Graph.pipeline()`, `add_conditional_edge()`
+- **Workflows / Networks**: `Workflow`, `Network`
+- **Typed tools**: `@tool`, `create_tool_executor()`, `with_tool()`
+- **MCP**: `McpServer`, `McpClient`
+- **A2A**: `A2aClient`
+- **Memory + RAG**: `Memory`, `VectorStore`, `TextSplitter`, `load_text/load_markdown/load_json`
+- **Guardrails + Middleware**: `GuardrailChain`, `MiddlewareChain`
+- **Reliability**: retry, circuit breaker, fallback providers
+- **Observability & quality**: `Telemetry`, `EvalRunner`
+- **Enterprise preset**: `enterprise_preset()`
 
-result = await graph.run("Write an article about quantum computing")
-```
+---
 
-### 🔄 Workflows
-
-```python
-from gauss import Workflow, Agent
-
-workflow = Workflow("analysis-pipeline")
-workflow.add_step("collect", collector_agent)
-workflow.add_step("analyze", analyst_agent)
-workflow.add_step("summarize", summarizer_agent)
-
-result = await workflow.run("Analyze market trends in AI")
-```
-
-### 🌐 Networks
-
-```python
-from gauss import Network, Agent
-
-network = Network()
-network.add_agent(Agent(name="math", model="o4-mini", instructions="Solve math."))
-network.add_agent(Agent(name="code", model="gpt-5.2", instructions="Write code."))
-network.set_supervisor("coordinator")
-
-result = await network.delegate("math", "What is the integral of x²?")
-```
-
-### 🎯 Structured Output
-
-```python
-agent = Agent(
-    name="extractor",
-    model="gpt-5.2",
-    output_schema={
-        "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "number"},
-            "skills": {"type": "array", "items": {"type": "string"}},
-        },
-        "required": ["name", "age", "skills"],
-    },
-)
-
-result = await agent.run("Extract: John is 30, knows Python and Rust")
-print(result.structured_output)
-# → {"name": "John", "age": 30, "skills": ["Python", "Rust"]}
-```
-
-### 💭 Reasoning
-
-```python
-from gauss import Agent, OPENAI_REASONING, ANTHROPIC_PREMIUM
-
-# OpenAI reasoning models (o4-mini)
-reasoner = Agent(
-    name="solver",
-    model=OPENAI_REASONING,
-    reasoning_effort="high",
-)
-
-# Anthropic extended thinking
-thinker = Agent(
-    name="analyst",
-    model=ANTHROPIC_PREMIUM,
-    thinking_budget=10000,
-)
-
-result = await thinker.run("Analyze this complex problem...")
-print(result.thinking)  # Internal reasoning process
-```
-
-## 📐 Model Constants
-
-Import model constants as the single source of truth:
+## Errors (typed hierarchy)
 
 ```python
 from gauss import (
-    OPENAI_DEFAULT,      # "gpt-5.2"
-    OPENAI_FAST,         # "gpt-4.1"
-    OPENAI_REASONING,    # "o4-mini"
-    OPENAI_IMAGE,        # "gpt-image-1"
-    ANTHROPIC_DEFAULT,   # "claude-sonnet-4-20250514"
-    ANTHROPIC_PREMIUM,   # "claude-opus-4-20250414"
-    ANTHROPIC_FAST,      # "claude-haiku-4-20250414"
-    GOOGLE_DEFAULT,      # "gemini-2.5-flash"
-    GOOGLE_PREMIUM,      # "gemini-2.5-pro"
-    DEEPSEEK_DEFAULT,    # "deepseek-chat"
-    DEEPSEEK_REASONING,  # "deepseek-reasoner"
-    PROVIDER_DEFAULTS,   # Provider → model mapping
-    default_model,       # Get default model for a provider
+    GaussError,
+    DisposedError,
+    ProviderError,
+    ToolExecutionError,
+    ValidationError,
+)
+
+try:
+    agent.run("hello")
+except DisposedError:
+    print("resource already destroyed")
+```
+
+---
+
+## Model Constants
+
+```python
+from gauss import (
+    OPENAI_DEFAULT, OPENAI_FAST, OPENAI_REASONING,
+    ANTHROPIC_DEFAULT, ANTHROPIC_FAST, ANTHROPIC_PREMIUM,
+    GOOGLE_DEFAULT, GOOGLE_PREMIUM,
+    DEEPSEEK_DEFAULT, DEEPSEEK_REASONING,
+    PROVIDER_DEFAULTS, default_model,
 )
 ```
 
-## 🌐 Providers
+---
 
-| Provider | Env Variable | Models |
-|----------|-------------|--------|
-| OpenAI | `OPENAI_API_KEY` | gpt-5.2, gpt-4.1, o4-mini |
-| Anthropic | `ANTHROPIC_API_KEY` | claude-sonnet-4, claude-opus-4, claude-haiku-4 |
-| Google | `GOOGLE_API_KEY` | gemini-2.5-flash, gemini-2.5-pro |
-| DeepSeek | `DEEPSEEK_API_KEY` | deepseek-chat, deepseek-reasoner |
-| Groq | `GROQ_API_KEY` | Any Groq-supported model |
-| Ollama | — (local) | Any Ollama model |
-| OpenRouter | `OPENROUTER_API_KEY` | 200+ models |
+## Providers
 
-## 📁 Examples
+| Provider | Env Variable | Example Default |
+|---|---|---|
+| OpenAI | `OPENAI_API_KEY` | `gpt-5.2` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
+| Google | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| Groq | `GROQ_API_KEY` | provider-dependent |
+| Ollama | local runtime | `llama3.2` |
+| OpenRouter | `OPENROUTER_API_KEY` | `openai/gpt-5.2` |
 
-See the [`examples/`](examples/) directory for 15 complete examples covering every feature.
+---
 
-## 🔗 Related
+## Architecture
 
-| Package | Language | Repository |
-|---------|----------|------------|
-| **gauss-core** | Rust | [giulio-leone/gauss-core](https://github.com/giulio-leone/gauss-core) |
-| **gauss-ts** | TypeScript | [giulio-leone/gauss](https://github.com/giulio-leone/gauss) |
+```text
+gauss-py (Python SDK)
+        │
+        ▼
+gauss-python (PyO3 bindings)
+        │
+        ▼
+gauss-core (Rust engine)
+```
+
+All heavy orchestration and runtime logic is executed in Rust.
+
+---
+
+## Ecosystem
+
+| Package | Language | Repo |
+|---|---|---|
+| `gauss-core` | Rust | https://github.com/giulio-leone/gauss-core |
+| `gauss-ts` | TypeScript | https://github.com/giulio-leone/gauss |
+| `gauss-py` | Python | https://github.com/giulio-leone/gauss-py |
 
 ## License
 
-MIT
+MIT © [Giulio Leone](https://github.com/giulio-leone)
