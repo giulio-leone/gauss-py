@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from gauss._types import SearchResult
 
@@ -81,6 +81,24 @@ class VectorStore:
             )
             for r in data
         ]
+
+    def search_by_text(
+        self,
+        query: str,
+        top_k: int = 5,
+        embed_fn: Callable[[str], list[float]] | None = None,
+    ) -> list[SearchResult]:
+        """Search by text query with auto-embedding.
+
+        Args:
+            query: Text query to search for.
+            top_k: Number of results to return.
+            embed_fn: Function that converts text to an embedding vector.
+        """
+        if embed_fn is None:
+            raise ValueError("embed_fn is required for text-based search")
+        embedding = embed_fn(query)
+        return self.search(embedding, top_k)
 
     @staticmethod
     def cosine_similarity(a: list[float], b: list[float]) -> float:

@@ -156,6 +156,15 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolValidator": ("gauss.tool_validator", "ToolValidator"),
     # vector_store
     "VectorStore": ("gauss.vector_store", "VectorStore"),
+    # text_splitter (M40)
+    "TextSplitter": ("gauss.text_splitter", "TextSplitter"),
+    "TextChunk": ("gauss.text_splitter", "TextChunk"),
+    "split_text": ("gauss.text_splitter", "split_text"),
+    # document_loader (M40)
+    "LoadedDocument": ("gauss.document_loader", "LoadedDocument"),
+    "load_text": ("gauss.document_loader", "load_text"),
+    "load_markdown": ("gauss.document_loader", "load_markdown"),
+    "load_json": ("gauss.document_loader", "load_json"),
     # workflow
     "Workflow": ("gauss.workflow", "Workflow"),
     # spec
@@ -362,4 +371,12 @@ __all__ = [
     "ToolRegistryEntry",
     "ToolRegistryExample",
     "ToolSearchResult",
+    # RAG / Text Splitting (M40)
+    "TextSplitter",
+    "TextChunk",
+    "split_text",
+    "LoadedDocument",
+    "load_text",
+    "load_markdown",
+    "load_json",
 ]
