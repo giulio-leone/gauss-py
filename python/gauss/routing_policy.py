@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
+from typing import Any
 
 from gauss._types import ProviderType
 
@@ -240,3 +241,88 @@ def _select_weighted_candidate(
         candidates,
         key=lambda c: (policy.provider_weights.get(c.provider, 0), c.priority),
     )
+
+
+def explain_routing_target(
+    policy: RoutingPolicy | None,
+    provider: ProviderType,
+    model: str,
+    *,
+    available_providers: list[ProviderType] | None = None,
+    estimated_cost_usd: float | None = None,
+    current_requests_per_minute: int | None = None,
+    current_hour_utc: int | None = None,
+    governance_tags: list[str] | None = None,
+) -> dict[str, Any]:
+    checks: list[dict[str, str]] = []
+    hour = current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.UTC).hour
+
+    def fail(check: str, error: Exception) -> dict[str, Any]:
+        message = str(error)
+        checks.append({"check": check, "status": "failed", "detail": message})
+        return {"ok": False, "checks": checks, "error": message}
+
+    if policy is not None and policy.allowed_hours_utc:
+        try:
+            enforce_routing_time_window(policy, hour)
+            checks.append({"check": "time_window", "status": "passed", "detail": f"hour={hour}"})
+        except RoutingPolicyError as exc:
+            return fail("time_window", exc)
+    else:
+        checks.append({"check": "time_window", "status": "skipped", "detail": "not configured"})
+
+    if estimated_cost_usd is not None:
+        try:
+            enforce_routing_cost_limit(policy, estimated_cost_usd)
+            checks.append(
+                {
+                    "check": "cost_limit",
+                    "status": "passed",
+                    "detail": f"cost={estimated_cost_usd}",
+                }
+            )
+        except RoutingPolicyError as exc:
+            return fail("cost_limit", exc)
+    else:
+        checks.append({"check": "cost_limit", "status": "skipped", "detail": "no estimate provided"})
+
+    if current_requests_per_minute is not None:
+        try:
+            enforce_routing_rate_limit(policy, current_requests_per_minute)
+            checks.append(
+                {
+                    "check": "rate_limit",
+                    "status": "passed",
+                    "detail": f"rpm={current_requests_per_minute}",
+                }
+            )
+        except RoutingPolicyError as exc:
+            return fail("rate_limit", exc)
+    else:
+        checks.append({"check": "rate_limit", "status": "skipped", "detail": "no rpm provided"})
+
+    try:
+        selected_provider, selected_model = resolve_routing_target(
+            policy,
+            provider,
+            model,
+            available_providers=available_providers,
+            estimated_cost_usd=estimated_cost_usd,
+            current_requests_per_minute=current_requests_per_minute,
+            current_hour_utc=current_hour_utc,
+            governance_tags=governance_tags,
+        )
+        checks.append({"check": "governance", "status": "passed", "detail": "accepted"})
+        checks.append({"check": "selection", "status": "passed", "detail": f"{selected_provider.value}/{selected_model}"})
+        return {
+            "ok": True,
+            "checks": checks,
+            "decision": {"provider": selected_provider.value, "model": selected_model},
+        }
+    except RoutingPolicyError as exc:
+        message = str(exc)
+        if "governance" in message:
+            checks.append({"check": "governance", "status": "failed", "detail": message})
+            checks.append({"check": "selection", "status": "skipped", "detail": "selection aborted"})
+            return {"ok": False, "checks": checks, "error": message}
+        return fail("selection", exc)

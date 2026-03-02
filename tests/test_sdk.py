@@ -490,6 +490,29 @@ class TestAgent:
         assert balanced.provider_weights.get(ProviderType.OPENAI) == 60
         assert balanced.provider_weights.get(ProviderType.ANTHROPIC) == 40
 
+    def test_explain_routing_target(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.routing_policy import RoutingPolicy, explain_routing_target
+
+        explained_ok = explain_routing_target(
+            RoutingPolicy(fallback_order=[ProviderType.OPENAI]),
+            ProviderType.OPENAI,
+            "gpt-5.2",
+            current_hour_utc=12,
+        )
+        assert explained_ok["ok"] is True
+        assert explained_ok["decision"]["provider"] == "openai"
+        assert any(check["check"] == "selection" and check["status"] == "passed" for check in explained_ok["checks"])
+
+        explained_fail = explain_routing_target(
+            RoutingPolicy(allowed_hours_utc=[9, 10, 11]),
+            ProviderType.OPENAI,
+            "gpt-5.2",
+            current_hour_utc=22,
+        )
+        assert explained_fail["ok"] is False
+        assert "routing policy rejected hour 22" in explained_fail["error"]
+
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
         from gauss.agent import Agent

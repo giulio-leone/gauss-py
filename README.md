@@ -219,11 +219,20 @@ runtime_routed = routed_agent.with_routing_context(
 )
 
 # Apply built-in enterprise governance packs
-from gauss import apply_governance_pack
+from gauss import apply_governance_pack, explain_routing_target
 hardened_policy = apply_governance_pack(
     RoutingPolicy(fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI]),
     "balanced_mix",
 )
+
+explanation = explain_routing_target(
+    hardened_policy,
+    ProviderType.OPENAI,
+    "gpt-5.2",
+    current_hour_utc=11,
+    governance_tags=["balanced"],
+)
+print(explanation)
 ```
 
 ### Unified Control Plane (M51 foundation)
