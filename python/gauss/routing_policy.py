@@ -22,16 +22,53 @@ class RoutingPolicy:
     max_total_cost_usd: float | None = None
 
 
+class RoutingPolicyError(ValueError):
+    """Routing policy rejection."""
+
+
 def resolve_routing_target(
     policy: RoutingPolicy | None,
     provider: ProviderType,
     model: str,
+    *,
+    available_providers: list[ProviderType] | None = None,
+    estimated_cost_usd: float | None = None,
 ) -> tuple[ProviderType, str]:
+    if estimated_cost_usd is not None:
+        enforce_routing_cost_limit(policy, estimated_cost_usd)
+
     if policy is None:
         return provider, model
     candidates = policy.aliases.get(model)
-    if not candidates:
-        return provider, model
-    selected = max(candidates, key=lambda c: c.priority)
-    return selected.provider, selected.model
+    if candidates:
+        selected = max(candidates, key=lambda c: c.priority)
+        return selected.provider, selected.model
 
+    fallback = resolve_fallback_provider(policy, available_providers or [])
+    if fallback is not None and fallback != provider:
+        return fallback, model
+
+    return provider, model
+
+
+def resolve_fallback_provider(
+    policy: RoutingPolicy | None,
+    available_providers: list[ProviderType],
+) -> ProviderType | None:
+    if policy is None or not policy.fallback_order or not available_providers:
+        return None
+    available = set(available_providers)
+    for provider in policy.fallback_order:
+        if provider in available:
+            return provider
+    return None
+
+
+def enforce_routing_cost_limit(
+    policy: RoutingPolicy | None,
+    cost_usd: float,
+) -> None:
+    if policy is None or policy.max_total_cost_usd is None:
+        return
+    if cost_usd > policy.max_total_cost_usd:
+        raise RoutingPolicyError(f"routing policy rejected cost {cost_usd}")

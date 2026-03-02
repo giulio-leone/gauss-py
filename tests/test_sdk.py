@@ -272,6 +272,31 @@ class TestAgent:
         agent.destroy()
         clone.destroy()
 
+    def test_routing_policy_fallback_helpers(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.routing_policy import RoutingPolicy, resolve_fallback_provider, resolve_routing_target
+
+        policy = RoutingPolicy(fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI])
+        fallback = resolve_fallback_provider(policy, [ProviderType.OPENAI])
+        assert fallback == ProviderType.OPENAI
+
+        provider, model = resolve_routing_target(
+            policy,
+            ProviderType.GOOGLE,
+            "gpt-5.2",
+            available_providers=[ProviderType.OPENAI],
+        )
+        assert provider == ProviderType.OPENAI
+        assert model == "gpt-5.2"
+
+    def test_routing_policy_cost_limit_helper(self) -> None:
+        from gauss.routing_policy import RoutingPolicy, RoutingPolicyError, enforce_routing_cost_limit
+
+        policy = RoutingPolicy(max_total_cost_usd=1.0)
+        enforce_routing_cost_limit(policy, 0.5)
+        with pytest.raises(RoutingPolicyError, match="routing policy rejected cost 1.5"):
+            enforce_routing_cost_limit(policy, 1.5)
+
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
         from gauss.agent import Agent

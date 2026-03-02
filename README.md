@@ -164,7 +164,9 @@ routed_agent = Agent(
                     priority=10,
                 )
             ]
-        }
+        },
+        fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI],
+        max_total_cost_usd=2.0,
     ),
 )
 ```
