@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from gauss.control_plane import ControlPlane
@@ -72,9 +73,12 @@ class TestControlPlane:
             assert caps["supports_ops_summary"] is True
             assert caps["supports_ops_tenants"] is True
             assert caps["supports_policy_explain"] is True
+            assert caps["supports_policy_explain_batch"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
             assert caps["policy_explain_path"] == "/api/ops/policy/explain"
+            assert caps["policy_explain_batch_path"] == "/api/ops/policy/explain/batch"
+            assert caps["policy_explain_simulate_path"] == "/api/ops/policy/explain/simulate"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -99,6 +103,29 @@ class TestControlPlane:
             assert explain["decision"]["provider"] == "openai"
             assert explain["decision"]["selected_by"] == "direct"
             assert any(item["check"] == "selection" and item["status"] == "passed" for item in explain["checks"])
+
+        scenarios = urllib.parse.quote(
+            json.dumps(
+                [
+                    {"provider": "openai", "model": "gpt-5.2", "hour": 10},
+                    {"provider": "openai", "model": "gpt-5.2", "hour": 22},
+                ]
+            )
+        )
+        with urllib.request.urlopen(f"{url}/api/ops/policy/explain/batch?scenarios={scenarios}") as resp:
+            batch = json.loads(resp.read().decode("utf-8"))
+            assert batch["ok"] is True
+            assert batch["total"] == 2
+            assert batch["passed"] == 1
+            assert batch["failed"] == 1
+            assert batch["results"][0]["explanation"]["ok"] is True
+            assert batch["results"][1]["explanation"]["ok"] is False
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/explain/simulate?scenarios={scenarios}") as resp:
+            simulation = json.loads(resp.read().decode("utf-8"))
+            assert simulation["total"] == 2
+            assert simulation["passed"] == 1
+            assert simulation["failed"] == 1
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")

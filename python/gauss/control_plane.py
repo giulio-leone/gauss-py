@@ -247,6 +247,16 @@ class ControlPlane:
                         self._send_json(payload)
                         return
 
+                    if parsed.path == "/api/ops/policy/explain/batch":
+                        payload = json.dumps(outer._ops_policy_explain_batch(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/explain/simulate":
+                        payload = json.dumps(outer._ops_policy_explain_simulation(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
                     if parsed.path == "/api/stream":
                         filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         channels = outer._parse_stream_channels(params)
@@ -428,10 +438,13 @@ class ControlPlane:
         field: str,
     ) -> float | None:
         raw = params.get(key, [None])[0]
+        return self._parse_optional_float_value(raw, field=field)
+
+    def _parse_optional_float_value(self, raw: Any, *, field: str) -> float | None:
         if raw is None or raw == "":
             return None
         try:
-            return float(raw)
+            return float(str(raw))
         except ValueError as exc:
             raise ValidationError(f'Invalid {field} "{raw}"', field) from exc
 
@@ -443,10 +456,13 @@ class ControlPlane:
         field: str,
     ) -> int | None:
         raw = params.get(key, [None])[0]
+        return self._parse_optional_int_value(raw, field=field)
+
+    def _parse_optional_int_value(self, raw: Any, *, field: str) -> int | None:
         if raw is None or raw == "":
             return None
         try:
-            return int(raw)
+            return int(str(raw))
         except ValueError as exc:
             raise ValidationError(f'Invalid {field} "{raw}"', field) from exc
 
@@ -454,26 +470,79 @@ class ControlPlane:
         self,
         params: dict[str, list[str]],
     ) -> tuple[ProviderType, str, dict[str, Any]]:
-        provider = self._parse_policy_provider(params.get("provider", ["openai"])[0] or "openai")
-        model = params.get("model", ["gpt-5.2"])[0] or "gpt-5.2"
+        return self._parse_policy_explain_scenario(
+            {
+                "provider": params.get("provider", ["openai"])[0],
+                "model": params.get("model", ["gpt-5.2"])[0],
+                "available": params.get("available", [None])[0],
+                "cost": params.get("cost", [None])[0],
+                "rpm": params.get("rpm", [None])[0],
+                "hour": params.get("hour", [None])[0],
+                "tags": params.get("tags", [None])[0],
+            }
+        )
 
-        available_raw = params.get("available", [None])[0]
+    def _parse_policy_explain_scenario(
+        self,
+        scenario: dict[str, Any],
+    ) -> tuple[ProviderType, str, dict[str, Any]]:
+        provider_raw = scenario.get("provider")
+        provider = self._parse_policy_provider(
+            provider_raw if isinstance(provider_raw, str) and provider_raw else "openai"
+        )
+        model_raw = scenario.get("model")
+        model = model_raw if isinstance(model_raw, str) and model_raw else "gpt-5.2"
+
+        available_raw = scenario.get("available")
+        available_values: list[str]
+        if isinstance(available_raw, str):
+            available_values = [value.strip() for value in available_raw.split(",") if value.strip()]
+        elif isinstance(available_raw, list):
+            available_values = [str(value).strip() for value in available_raw if str(value).strip()]
+        else:
+            available_values = []
         available_providers = (
-            [self._parse_policy_provider(value) for value in available_raw.split(",") if value.strip()]
-            if available_raw
+            [self._parse_policy_provider(value) for value in available_values]
+            if available_values
             else None
         )
-        tags_raw = params.get("tags", [None])[0]
-        governance_tags = [value.strip() for value in tags_raw.split(",") if value.strip()] if tags_raw else None
+
+        tags_raw = scenario.get("tags")
+        if isinstance(tags_raw, str):
+            governance_tags = [value.strip() for value in tags_raw.split(",") if value.strip()]
+        elif isinstance(tags_raw, list):
+            governance_tags = [str(value).strip() for value in tags_raw if str(value).strip()]
+        else:
+            governance_tags = None
 
         options = {
             "available_providers": available_providers,
-            "estimated_cost_usd": self._parse_optional_float(params, "cost", field="cost"),
-            "current_requests_per_minute": self._parse_optional_int(params, "rpm", field="rpm"),
-            "current_hour_utc": self._parse_optional_int(params, "hour", field="hour"),
+            "estimated_cost_usd": self._parse_optional_float_value(scenario.get("cost"), field="cost"),
+            "current_requests_per_minute": self._parse_optional_int_value(scenario.get("rpm"), field="rpm"),
+            "current_hour_utc": self._parse_optional_int_value(scenario.get("hour"), field="hour"),
             "governance_tags": governance_tags,
         }
         return provider, model, options
+
+    def _parse_policy_explain_batch_scenarios(
+        self,
+        params: dict[str, list[str]],
+    ) -> list[tuple[ProviderType, str, dict[str, Any]]]:
+        raw = params.get("scenarios", [None])[0]
+        if raw is None or raw == "":
+            raise ValidationError("Missing scenarios query parameter", "scenarios")
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValidationError("Invalid scenarios JSON payload", "scenarios") from exc
+        if not isinstance(parsed, list) or not parsed:
+            raise ValidationError("scenarios must be a non-empty array", "scenarios")
+        out: list[tuple[ProviderType, str, dict[str, Any]]] = []
+        for index, item in enumerate(parsed):
+            if not isinstance(item, dict):
+                raise ValidationError(f"Scenario {index} must be an object", "scenarios")
+            out.append(self._parse_policy_explain_scenario(item))
+        return out
 
     def _ops_policy_explain(self, params: dict[str, list[str]]) -> dict[str, Any]:
         from gauss.routing_policy import explain_routing_target
@@ -489,6 +558,42 @@ class ControlPlane:
             current_hour_utc=options["current_hour_utc"],
             governance_tags=options["governance_tags"],
         )
+
+    def _ops_policy_explain_batch(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        from gauss.routing_policy import explain_routing_target
+
+        scenarios = self._parse_policy_explain_batch_scenarios(params)
+        results: list[dict[str, Any]] = []
+        for index, (provider, model, options) in enumerate(scenarios):
+            explanation = explain_routing_target(
+                self._routing_policy,
+                provider,
+                model,
+                available_providers=options["available_providers"],
+                estimated_cost_usd=options["estimated_cost_usd"],
+                current_requests_per_minute=options["current_requests_per_minute"],
+                current_hour_utc=options["current_hour_utc"],
+                governance_tags=options["governance_tags"],
+            )
+            results.append(
+                {
+                    "index": index,
+                    "input": {"provider": provider.value, "model": model},
+                    "explanation": explanation,
+                }
+            )
+
+        passed = sum(1 for item in results if bool(item["explanation"].get("ok")))
+        return {
+            "ok": True,
+            "total": len(results),
+            "passed": passed,
+            "failed": len(results) - passed,
+            "results": results,
+        }
+
+    def _ops_policy_explain_simulation(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        return self._ops_policy_explain_batch(params)
 
     def _parse_stream_channel(self, channel: str | None) -> str:
         if channel is None:
@@ -708,9 +813,12 @@ class ControlPlane:
             "supports_ops_summary": True,
             "supports_ops_tenants": True,
             "supports_policy_explain": True,
+            "supports_policy_explain_batch": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
             "policy_explain_path": "/api/ops/policy/explain",
+            "policy_explain_batch_path": "/api/ops/policy/explain/batch",
+            "policy_explain_simulate_path": "/api/ops/policy/explain/simulate",
         }
 
     def _ops_health(self) -> dict[str, Any]:
