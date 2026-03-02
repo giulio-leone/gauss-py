@@ -29,7 +29,7 @@ def _agent_opts(**overrides):
 
 
 @dataclass
-class TestResult:
+class E2ETestResult:
     test: str
     feature: str
     success: bool
@@ -38,10 +38,10 @@ class TestResult:
     error: str = ""
 
 
-results: list[TestResult] = []
+results: list[E2ETestResult] = []
 
 
-def record(r: TestResult) -> None:
+def record(r: E2ETestResult) -> None:
     results.append(r)
     icon = "✅" if r.success else "❌"
     print(f"  {icon} {r.feature:<30} {r.test:<25} {r.latency_ms:.0f}ms")
@@ -73,7 +73,7 @@ class TestOpenRouterAdvanced:
             result = agent.run("What is 2+2?")
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="basic-run", feature="Agent.run",
                 success=True, latency_ms=latency,
                 output=result.text[:50],
@@ -93,7 +93,7 @@ class TestOpenRouterAdvanced:
             text = agent.generate("What is 1+1?")
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="generate", feature="Agent.generate",
                 success=True, latency_ms=latency,
                 output=text[:30],
@@ -112,7 +112,7 @@ class TestOpenRouterAdvanced:
         )
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="gauss-oneliner", feature="gauss()",
             success=True, latency_ms=latency,
             output=text[:20],
@@ -141,7 +141,7 @@ class TestOpenRouterAdvanced:
             )
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="structured-output", feature="structured()",
                 success=True, latency_ms=latency,
                 output=json.dumps(r.data),
@@ -164,7 +164,7 @@ class TestOpenRouterAdvanced:
             result = agent.run(t(word="hello", lang="Italian"))
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="template", feature="template()",
                 success=True, latency_ms=latency,
                 output=result.text[:20],
@@ -185,7 +185,7 @@ class TestOpenRouterAdvanced:
         )
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="batch", feature="batch()",
             success=True, latency_ms=latency,
             output=", ".join(r.result.text[:10] for r in results_batch if r.result),
@@ -214,7 +214,7 @@ class TestOpenRouterAdvanced:
         result = asyncio.run(pipe("Rome", ask_country, run_agent))
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="pipeline", feature="pipe()",
             success=True, latency_ms=latency,
             output=result[:20],
@@ -246,7 +246,7 @@ class TestOpenRouterAdvanced:
         result = graph.run("Tell me about black holes")
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="graph-dag", feature="Graph (DAG)",
             success=True, latency_ms=latency,
             output=str(result)[:80],
@@ -280,7 +280,7 @@ class TestOpenRouterAdvanced:
         cards_result = "N/A — agent_cards not exposed in Python SDK"
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="network-setup", feature="Network setup",
             success=True, latency_ms=latency,
             output=cards_result[:80],
@@ -291,14 +291,14 @@ class TestOpenRouterAdvanced:
         try:
             delegate_result = net.delegate("math-expert", "What is 7*8?")
             delegate_latency = (time.time() - delegate_start) * 1000
-            record(TestResult(
+            record(E2ETestResult(
                 test="network-delegate", feature="Network.delegate()",
                 success=True, latency_ms=delegate_latency,
                 output=str(delegate_result)[:50],
             ))
         except Exception as e:
             delegate_latency = (time.time() - delegate_start) * 1000
-            record(TestResult(
+            record(E2ETestResult(
                 test="network-delegate", feature="Network.delegate()",
                 success=False, latency_ms=delegate_latency,
                 error=str(e)[:80],
@@ -327,7 +327,7 @@ class TestOpenRouterAdvanced:
         result = wf.run("Start the workflow")
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="workflow", feature="Workflow",
             success=True, latency_ms=latency,
             output=str(result)[:80],
@@ -345,7 +345,7 @@ class TestOpenRouterAdvanced:
         chain.use_caching(5000)
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="middleware", feature="MiddlewareChain",
             success=True, latency_ms=latency,
             output="logging + caching configured",

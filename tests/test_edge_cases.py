@@ -15,7 +15,7 @@ from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
-# Mock the native module globally (must happen before importing gauss)
+# Mock native bindings for deterministic edge-case tests.
 # ---------------------------------------------------------------------------
 _mock_native = MagicMock()
 _mock_native.create_provider.return_value = 1
@@ -29,10 +29,6 @@ _mock_native.agent_run.return_value = json.dumps({
 _mock_native.generate.return_value = "Hello"
 _mock_native.stream_generate = MagicMock(return_value="[]")
 
-# Set mock before any gauss import
-if "gauss._native" not in sys.modules:
-    sys.modules["gauss._native"] = _mock_native
-
 from gauss.agent import Agent, AgentConfig
 from gauss.batch import batch
 from gauss.retry import with_retry, retryable, RetryConfig, _compute_delay
@@ -43,12 +39,15 @@ from gauss.pipeline import (
     reduce_sync, reduce_async, compose, compose_async,
 )
 
-# Ensure _native mock is accessible for structured tests that change return values
-_native = sys.modules["gauss._native"]
-
 import os
 # Set env for auto-detection so Agent() works
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-edge-case")
+
+
+@pytest.fixture(autouse=True)
+def _patch_native(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "gauss._native", _mock_native)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-edge-case")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -143,7 +142,7 @@ class TestRetryEdgeCases:
 
 class TestStructuredEdgeCases:
     def _set_agent_text(self, text: str) -> None:
-        _native.agent_run.return_value = json.dumps({
+        _mock_native.agent_run.return_value = json.dumps({
             "text": text,
             "messages": [{"role": "assistant", "content": text}],
             "toolCalls": [],
@@ -151,7 +150,7 @@ class TestStructuredEdgeCases:
         })
 
     def _reset_agent_text(self) -> None:
-        _native.agent_run.return_value = json.dumps({
+        _mock_native.agent_run.return_value = json.dumps({
             "text": '{"result":"ok"}',
             "messages": [{"role": "assistant", "content": '{"result":"ok"}'}],
             "toolCalls": [],

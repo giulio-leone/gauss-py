@@ -109,3 +109,29 @@ class TestControlPlane:
             lines = [line for line in f.read().splitlines() if line.strip()]
             assert len(lines) >= 1
         os.remove(persist_path)
+
+    def test_supports_tenant_session_filters(self):
+        cp = ControlPlane(
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+        )
+        cp.with_context({"tenant_id": "t-1", "session_id": "s-1", "run_id": "r-1"}).snapshot()
+        cp.with_context({"tenant_id": "t-2", "session_id": "s-2", "run_id": "r-2"}).snapshot()
+
+        url = cp.start_server(port=0)
+        with urllib.request.urlopen(f"{url}/api/history?tenant=t-1") as resp:
+            history = json.loads(resp.read().decode("utf-8"))
+            assert len(history) == 1
+            assert history[0]["context"]["tenant_id"] == "t-1"
+
+        with urllib.request.urlopen(f"{url}/api/timeline?session=s-2") as resp:
+            timeline = json.loads(resp.read().decode("utf-8"))
+            assert len(timeline) == 1
+            assert timeline[0]["span_count"] == 1
+
+        with urllib.request.urlopen(f"{url}/api/dag?run=r-1") as resp:
+            dag = json.loads(resp.read().decode("utf-8"))
+            assert len(dag["nodes"]) == 1
+            assert dag["nodes"][0]["label"] == "agent.run"
+
+        cp.stop_server()

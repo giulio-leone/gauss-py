@@ -9,7 +9,7 @@ import asyncio
 import json
 import os
 import sys
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -49,14 +49,14 @@ _mock_native.create_graph.return_value = 900
 _mock_native.destroy_graph.return_value = None
 _mock_native.graph_add_node.return_value = None
 _mock_native.graph_add_edge.return_value = None
-_mock_native.graph_run = AsyncMock(return_value=json.dumps({"node1": "result"}))
+_mock_native.graph_run = MagicMock(return_value=json.dumps({"node1": "result"}))
 
 # Workflow
 _mock_native.create_workflow.return_value = 600
 _mock_native.destroy_workflow.return_value = None
 _mock_native.workflow_add_step.return_value = None
 _mock_native.workflow_add_dependency.return_value = None
-_mock_native.workflow_run = AsyncMock(return_value=json.dumps({"step1": "done"}))
+_mock_native.workflow_run = MagicMock(return_value=json.dumps({"step1": "done"}))
 
 # Provider (needed for Network delegate)
 _mock_native.create_provider.return_value = 1
@@ -208,7 +208,7 @@ class TestGraphToolConversionAndRun:
 
         g = Graph()
         g.add_node("n1", mock_agent, instructions="step 1")
-        result = asyncio.get_event_loop().run_until_complete(g.run("test input"))
+        result = g.run("test input")
         assert result is not None
         g.destroy()
 
@@ -239,7 +239,7 @@ class TestWorkflowToolConversionAndRun:
 
         w = Workflow()
         w.add_step("s1", mock_agent, instructions="step 1")
-        result = asyncio.get_event_loop().run_until_complete(w.run("input"))
+        result = w.run("input")
         assert result is not None
         w.destroy()
 
@@ -261,7 +261,7 @@ class TestComposeAsync:
             composed = await compose_async(double, add_one)
             return await composed(5)
 
-        result = asyncio.get_event_loop().run_until_complete(_test())
+        result = asyncio.run(_test())
         assert result == 11  # (5 * 2) + 1
 
     def test_compose_async_single(self) -> None:
@@ -274,7 +274,7 @@ class TestComposeAsync:
             composed = await compose_async(identity)
             return await composed("hello")
 
-        result = asyncio.get_event_loop().run_until_complete(_test())
+        result = asyncio.run(_test())
         assert result == "hello"
 
     def test_compose_async_chain_three(self) -> None:
@@ -293,7 +293,7 @@ class TestComposeAsync:
             composed = await compose_async(step1, step2, step3)
             return await composed(3)
 
-        result = asyncio.get_event_loop().run_until_complete(_test())
+        result = asyncio.run(_test())
         assert result == "result:40"
 
 
@@ -335,4 +335,3 @@ class TestDoubleDestroy:
         w = Workflow()
         w.destroy()
         w.destroy()
-

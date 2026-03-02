@@ -27,7 +27,7 @@ skip_no_key = pytest.mark.skipif(not API_KEY, reason="OPENAI_API_KEY not set")
 
 
 @dataclass
-class TestResult:
+class E2ETestResult:
     test: str
     feature: str
     success: bool
@@ -37,10 +37,10 @@ class TestResult:
     error: str | None = None
 
 
-_results: list[TestResult] = []
+_results: list[E2ETestResult] = []
 
 
-def record(r: TestResult) -> None:
+def record(r: E2ETestResult) -> None:
     _results.append(r)
 
 
@@ -111,7 +111,7 @@ class TestGPT5Features:
             latency = (time.time() - start) * 1000
             usage = r.usage
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="simple-completion", feature="Agent.run",
                 success=True, latency_ms=latency,
                 tokens={"input": usage.get("inputTokens", 0), "output": usage.get("outputTokens", 0)},
@@ -132,7 +132,7 @@ class TestGPT5Features:
             r = agent.run("2+2?")
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="system-instructions", feature="Agent.run",
                 success=True, latency_ms=latency,
                 tokens={"input": r.usage.get("inputTokens", 0), "output": r.usage.get("outputTokens", 0)},
@@ -158,7 +158,7 @@ class TestGPT5Features:
             ])
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="multi-turn", feature="Agent.run",
                 success=True, latency_ms=latency,
                 tokens={"input": r1.usage.get("inputTokens", 0) + r2.usage.get("inputTokens", 0),
@@ -177,7 +177,7 @@ class TestGPT5Features:
             text = agent.generate("Say OK")
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="generate-raw", feature="Agent.generate",
                 success=True, latency_ms=latency,
                 output=text,
@@ -201,7 +201,7 @@ class TestGPT5Features:
                 events.append(event)
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="streaming", feature="Agent.stream_iter",
                 success=True, latency_ms=latency,
                 output=f"{len(events)} events, text: {stream.text}",
@@ -217,7 +217,7 @@ class TestGPT5Features:
         answer = gauss_fn("2+3? Number only.", **_agent_opts())
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="one-liner", feature="gauss()",
             success=True, latency_ms=latency,
             output=answer,
@@ -246,7 +246,7 @@ class TestGPT5Features:
             )
             latency = (time.time() - start) * 1000
 
-            record(TestResult(
+            record(E2ETestResult(
                 test="structured-output", feature="structured()",
                 success=True, latency_ms=latency,
                 output=json.dumps(r.data),
@@ -266,7 +266,7 @@ class TestGPT5Features:
         answer = gauss_fn(prompt, **_agent_opts())
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="template", feature="template()",
             success=True, latency_ms=latency,
             output=answer,
@@ -287,7 +287,7 @@ class TestGPT5Features:
         latency = (time.time() - start) * 1000
 
         outputs = [i.result.text.strip() if i.result else "ERR" for i in items]
-        record(TestResult(
+        record(E2ETestResult(
             test="batch-parallel", feature="batch()",
             success=True, latency_ms=latency,
             output=", ".join(outputs),
@@ -309,7 +309,7 @@ class TestGPT5Features:
         )
         latency = (time.time() - start) * 1000
 
-        record(TestResult(
+        record(E2ETestResult(
             test="pipeline", feature="pipe()",
             success=True, latency_ms=latency,
             output=str(result),
@@ -329,7 +329,7 @@ class TestGPT5Features:
         with pytest.raises(RuntimeError, match="destroyed"):
             agent.run("Fail")
 
-        record(TestResult(
+        record(E2ETestResult(
             test="lifecycle", feature="Agent.destroy",
             success=True, latency_ms=0,
             output="destroy + post-destroy error OK",
@@ -351,7 +351,7 @@ class TestGPT5Features:
         with pytest.raises(RuntimeError, match="destroyed"):
             agent.run("Fail")
 
-        record(TestResult(
+        record(E2ETestResult(
             test="context-manager", feature="with Agent()",
             success=True, latency_ms=latency,
             output="with-block + auto-destroy OK",
@@ -367,7 +367,7 @@ class TestGPT5Features:
         assert isinstance(agent.handle, int)
         agent.destroy()
 
-        record(TestResult(
+        record(E2ETestResult(
             test="properties", feature="Agent props",
             success=True, latency_ms=0,
             output="handle OK",

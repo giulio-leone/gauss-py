@@ -33,6 +33,7 @@ class ControlPlane:
         auth_token: str | None = None,
         persist_path: str | None = None,
         history_limit: int = 200,
+        context: dict[str, str] | None = None,
     ) -> None:
         self._telemetry = telemetry
         self._approvals = approvals
@@ -40,6 +41,7 @@ class ControlPlane:
         self._auth_token = auth_token
         self._persist_path = persist_path
         self._history_limit = history_limit
+        self._context: dict[str, str] = dict(context or {})
 
         self._latest_cost: Any = None
         self._history: list[dict[str, Any]] = []
@@ -52,6 +54,10 @@ class ControlPlane:
 
     def with_auth_token(self, token: str | None) -> "ControlPlane":
         self._auth_token = token
+        return self
+
+    def with_context(self, context: dict[str, str]) -> "ControlPlane":
+        self._context = dict(context)
         return self
 
     def set_cost_usage(
@@ -79,14 +85,14 @@ class ControlPlane:
             return full
         if section not in _SECTION_KEYS:
             raise ValidationError(f'Unknown section "{section}"', "section")
-        return {"generated_at": full["generated_at"], section: full[section]}
+        return {"generated_at": full["generated_at"], "context": full["context"], section: full[section]}
 
-    def history(self) -> list[dict[str, Any]]:
-        return list(self._history)
+    def history(self, filters: dict[str, str | None] | None = None) -> list[dict[str, Any]]:
+        return self._filter_history(filters)
 
-    def timeline(self) -> list[dict[str, Any]]:
+    def timeline(self, filters: dict[str, str | None] | None = None) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
-        for item in self._history:
+        for item in self._filter_history(filters):
             spans = item.get("spans")
             pending = item.get("pending_approvals")
             latest_cost = item.get("latest_cost")
@@ -100,10 +106,11 @@ class ControlPlane:
             )
         return out
 
-    def dag(self) -> dict[str, list[dict[str, str]]]:
-        if not self._history:
+    def dag(self, filters: dict[str, str | None] | None = None) -> dict[str, list[dict[str, str]]]:
+        filtered = self._filter_history(filters)
+        if not filtered:
             return {"nodes": [], "edges": []}
-        latest = self._history[-1]
+        latest = filtered[-1]
         spans = latest.get("spans")
         if not isinstance(spans, list):
             return {"nodes": [], "edges": []}
@@ -149,17 +156,23 @@ class ControlPlane:
                         return
 
                     if parsed.path == "/api/history":
-                        payload = json.dumps(outer.history(), indent=2).encode("utf-8")
+                        payload = json.dumps(
+                            outer.history(outer._parse_context_filters(params)), indent=2
+                        ).encode("utf-8")
                         self._send_json(payload)
                         return
 
                     if parsed.path == "/api/timeline":
-                        payload = json.dumps(outer.timeline(), indent=2).encode("utf-8")
+                        payload = json.dumps(
+                            outer.timeline(outer._parse_context_filters(params)), indent=2
+                        ).encode("utf-8")
                         self._send_json(payload)
                         return
 
                     if parsed.path == "/api/dag":
-                        payload = json.dumps(outer.dag(), indent=2).encode("utf-8")
+                        payload = json.dumps(
+                            outer.dag(outer._parse_context_filters(params)), indent=2
+                        ).encode("utf-8")
                         self._send_json(payload)
                         return
 
@@ -219,7 +232,8 @@ class ControlPlane:
 
     def _capture_snapshot(self) -> dict[str, Any]:
         item = {
-            "generated_at": dt.datetime.utcnow().isoformat() + "Z",
+            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "context": dict(self._context),
             "spans": self._telemetry.export_spans() if self._telemetry else [],
             "metrics": self._telemetry.export_metrics() if self._telemetry else {},
             "pending_approvals": self._approvals.list_pending() if self._approvals else [],
@@ -246,6 +260,44 @@ class ControlPlane:
             or x_token == self._auth_token
             or query_token == self._auth_token
         )
+
+    def _parse_context_filters(self, params: dict[str, list[str]]) -> dict[str, str | None]:
+        return {
+            "tenant_id": params.get("tenant", [None])[0],
+            "session_id": params.get("session", [None])[0],
+            "run_id": params.get("run", [None])[0],
+        }
+
+    def _filter_history(self, filters: dict[str, str | None] | None) -> list[dict[str, Any]]:
+        if not filters:
+            return list(self._history)
+        tenant_id = filters.get("tenant_id")
+        session_id = filters.get("session_id")
+        run_id = filters.get("run_id")
+        if not tenant_id and not session_id and not run_id:
+            return list(self._history)
+        return [
+            item
+            for item in self._history
+            if self._matches_context(item.get("context"), tenant_id, session_id, run_id)
+        ]
+
+    def _matches_context(
+        self,
+        context: Any,
+        tenant_id: str | None,
+        session_id: str | None,
+        run_id: str | None,
+    ) -> bool:
+        if not isinstance(context, dict):
+            return tenant_id is None and session_id is None and run_id is None
+        if tenant_id and context.get("tenant_id") != tenant_id:
+            return False
+        if session_id and context.get("session_id") != session_id:
+            return False
+        if run_id and context.get("run_id") != run_id:
+            return False
+        return True
 
     def _render_dashboard_html(self) -> str:
         return """<!doctype html>
@@ -287,4 +339,3 @@ class ControlPlane:
   </script>
 </body>
 </html>"""
-

@@ -34,7 +34,7 @@ skip_no_openrouter = pytest.mark.skipif(
 
 
 @dataclass
-class TestResult:
+class E2ETestResult:
     provider: str
     model: str
     test: str
@@ -44,10 +44,10 @@ class TestResult:
     output: str | None = None
 
 
-_results: list[TestResult] = []
+_results: list[E2ETestResult] = []
 
 
-def record(r: TestResult) -> None:
+def record(r: E2ETestResult) -> None:
     _results.append(r)
 
 
@@ -79,7 +79,7 @@ class TestOpenAIProvider:
             assert "4" in text
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openai",
                     model="gpt-4o-mini",
                     test="simple-completion",
@@ -113,7 +113,7 @@ class TestOpenAIProvider:
             assert "arrr" in text.lower()
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openai",
                     model="gpt-4o-mini",
                     test="system-instructions",
@@ -168,7 +168,7 @@ class TestOpenAIProvider:
             assert "345" in text
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openai",
                     model="gpt-4o-mini",
                     test="tool-calling",
@@ -206,7 +206,7 @@ class TestOpenAIProvider:
             assert "alice" in text.lower()
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openai",
                     model="gpt-4o-mini",
                     test="multi-turn",
@@ -249,7 +249,7 @@ class TestOpenRouterProvider:
             assert "paris" in text.lower()
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openrouter",
                     model="openai/gpt-4o-mini",
                     test="simple-completion",
@@ -286,7 +286,7 @@ class TestOpenRouterProvider:
             assert "20" in text
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openrouter",
                     model="anthropic/claude-3.5-haiku",
                     test="claude-completion",
@@ -335,7 +335,7 @@ class TestOpenRouterProvider:
             latency = (time.time() - start) * 1000
 
             record(
-                TestResult(
+                E2ETestResult(
                     provider="openrouter",
                     model="openai/gpt-4o-mini",
                     test="tool-calling",
