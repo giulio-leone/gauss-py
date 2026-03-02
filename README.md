@@ -219,23 +219,35 @@ runtime_routed = routed_agent.with_routing_context(
 )
 
 # Apply built-in enterprise governance packs
-from gauss import apply_governance_pack, explain_routing_target
+from gauss import (
+    apply_governance_pack,
+    evaluate_policy_diff,
+    evaluate_policy_rollout_guardrails,
+    explain_routing_target,
+)
 hardened_policy = apply_governance_pack(
     RoutingPolicy(fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI]),
     "balanced_mix",
 )
+rollout_policy = apply_governance_pack(hardened_policy, "rollout_canary")
 
 explanation = explain_routing_target(
-    hardened_policy,
+    rollout_policy,
     ProviderType.OPENAI,
     "gpt-5.2",
     current_hour_utc=11,
-    governance_tags=["balanced"],
+    governance_tags=["balanced", "rollout"],
 )
 print(explanation["decision"]["selected_by"])  # "direct" | "alias:..." | "fallback:..."
 
+# Rollout diff + guardrails (regression-aware)
+# diff = evaluate_policy_diff(rollout_policy, scenarios)
+# rollout_gate = evaluate_policy_rollout_guardrails(diff, {"max_regressions": 0, "min_candidate_pass_rate": 0.95})
+
 # CI-friendly policy gate summary (exit code 1 on failures)
 # python -m gauss.policy_gate ./scenarios.json ./policy.json
+# Optional rollout guardrails (diff + thresholds):
+# python -m gauss.policy_gate ./scenarios.json ./candidate-policy.json ./baseline-policy.json ./guardrails.json
 ```
 
 ### Unified Control Plane (M51 foundation)

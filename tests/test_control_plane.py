@@ -141,6 +141,7 @@ class TestControlPlane:
             assert diff["baseline_passed"] == 2
             assert diff["candidate_passed"] == 1
             assert diff["changed"] == 1
+            assert diff["regressions"] == 1
 
         with urllib.request.urlopen(f"{url}/api/ops/policy/explain/traces") as resp:
             traces = json.loads(resp.read().decode("utf-8"))

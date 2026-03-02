@@ -94,6 +94,8 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "resolve_routing_target": ("gauss.routing_policy", "resolve_routing_target"),
     "explain_routing_target": ("gauss.routing_policy", "explain_routing_target"),
     "evaluate_policy_gate": ("gauss.routing_policy", "evaluate_policy_gate"),
+    "evaluate_policy_diff": ("gauss.routing_policy", "evaluate_policy_diff"),
+    "evaluate_policy_rollout_guardrails": ("gauss.routing_policy", "evaluate_policy_rollout_guardrails"),
     "resolve_fallback_provider": ("gauss.routing_policy", "resolve_fallback_provider"),
     "enforce_routing_cost_limit": ("gauss.routing_policy", "enforce_routing_cost_limit"),
     "enforce_routing_rate_limit": ("gauss.routing_policy", "enforce_routing_rate_limit"),

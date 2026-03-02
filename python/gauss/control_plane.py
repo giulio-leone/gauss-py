@@ -630,55 +630,36 @@ class ControlPlane:
         return {**response, "trace_id": trace["trace_id"]}
 
     def _ops_policy_explain_diff(self, params: dict[str, list[str]]) -> dict[str, Any]:
-        from gauss.routing_policy import explain_routing_target
+        from gauss.routing_policy import evaluate_policy_diff
 
         scenarios = self._parse_policy_explain_batch_scenarios(params)
-        results: list[dict[str, Any]] = []
-        for index, (provider, model, options) in enumerate(scenarios):
-            baseline = explain_routing_target(
-                None,
-                provider,
-                model,
-                available_providers=options["available_providers"],
-                estimated_cost_usd=options["estimated_cost_usd"],
-                current_requests_per_minute=options["current_requests_per_minute"],
-                current_hour_utc=options["current_hour_utc"],
-                governance_tags=options["governance_tags"],
-            )
-            candidate = explain_routing_target(
-                self._routing_policy,
-                provider,
-                model,
-                available_providers=options["available_providers"],
-                estimated_cost_usd=options["estimated_cost_usd"],
-                current_requests_per_minute=options["current_requests_per_minute"],
-                current_hour_utc=options["current_hour_utc"],
-                governance_tags=options["governance_tags"],
-            )
-            changed = (
-                baseline.get("ok") != candidate.get("ok")
-                or (baseline.get("decision") or {}).get("provider")
-                != (candidate.get("decision") or {}).get("provider")
-                or (baseline.get("decision") or {}).get("model")
-                != (candidate.get("decision") or {}).get("model")
-            )
-            results.append(
+        diff = evaluate_policy_diff(
+            self._routing_policy,
+            [
                 {
-                    "index": index,
-                    "input": {"provider": provider.value, "model": model},
-                    "baseline": baseline,
-                    "candidate": candidate,
-                    "changed": changed,
+                    "provider": provider,
+                    "model": model,
+                    "options": {
+                        "available_providers": options["available_providers"],
+                        "estimated_cost_usd": options["estimated_cost_usd"],
+                        "current_requests_per_minute": options["current_requests_per_minute"],
+                        "current_hour_utc": options["current_hour_utc"],
+                        "governance_tags": options["governance_tags"],
+                    },
                 }
-            )
+                for provider, model, options in scenarios
+            ],
+            None,
+        )
 
         response = {
             "ok": True,
-            "total": len(results),
-            "baseline_passed": sum(1 for item in results if item["baseline"].get("ok")),
-            "candidate_passed": sum(1 for item in results if item["candidate"].get("ok")),
-            "changed": sum(1 for item in results if item["changed"]),
-            "results": results,
+            "total": diff["total"],
+            "baseline_passed": diff["baseline_passed"],
+            "candidate_passed": diff["candidate_passed"],
+            "changed": diff["changed"],
+            "regressions": diff["regressions"],
+            "results": diff["results"],
         }
         trace = self._record_policy_explain_trace("diff", response)
         return {**response, "trace_id": trace["trace_id"]}

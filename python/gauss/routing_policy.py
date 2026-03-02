@@ -27,6 +27,11 @@ class GovernanceRule:
 @dataclass
 class GovernancePolicyPack:
     rules: list[GovernanceRule] = field(default_factory=list)
+    max_total_cost_usd: float | None = None
+    max_requests_per_minute: int | None = None
+    allowed_hours_utc: list[int] = field(default_factory=list)
+    provider_weights: dict[ProviderType, int] = field(default_factory=dict)
+    fallback_order: list[ProviderType] = field(default_factory=list)
 
 
 @dataclass
@@ -66,17 +71,53 @@ def governance_policy_pack(name: str) -> GovernancePolicyPack:
                 GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
                 GovernanceRule(type="allow_provider", provider=ProviderType.DEEPSEEK),
                 GovernanceRule(type="require_tag", tag="cost-sensitive"),
-            ]
+            ],
+            max_total_cost_usd=0.15,
         )
     if name == "ops_business_hours":
-        return GovernancePolicyPack(rules=[GovernanceRule(type="require_tag", tag="ops")])
+        return GovernancePolicyPack(
+            rules=[GovernanceRule(type="require_tag", tag="ops")],
+            allowed_hours_utc=list(range(8, 19)),
+        )
     if name == "balanced_mix":
         return GovernancePolicyPack(
             rules=[
                 GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
                 GovernanceRule(type="allow_provider", provider=ProviderType.ANTHROPIC),
                 GovernanceRule(type="require_tag", tag="balanced"),
-            ]
+            ],
+            provider_weights={
+                ProviderType.OPENAI: 60,
+                ProviderType.ANTHROPIC: 40,
+            },
+        )
+    if name == "rollout_canary":
+        return GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                GovernanceRule(type="allow_provider", provider=ProviderType.ANTHROPIC),
+                GovernanceRule(type="require_tag", tag="rollout"),
+            ],
+            max_total_cost_usd=0.1,
+            max_requests_per_minute=30,
+            provider_weights={
+                ProviderType.OPENAI: 70,
+                ProviderType.ANTHROPIC: 30,
+            },
+            fallback_order=[ProviderType.OPENAI, ProviderType.ANTHROPIC],
+        )
+    if name == "rollout_strict":
+        return GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                GovernanceRule(type="allow_provider", provider=ProviderType.ANTHROPIC),
+                GovernanceRule(type="require_tag", tag="rollout"),
+                GovernanceRule(type="require_tag", tag="approved"),
+            ],
+            max_total_cost_usd=0.08,
+            max_requests_per_minute=15,
+            allowed_hours_utc=list(range(9, 18)),
+            fallback_order=[ProviderType.OPENAI, ProviderType.ANTHROPIC],
         )
     raise RoutingPolicyError(f"unknown governance policy pack {name!r}")
 
@@ -86,22 +127,28 @@ def apply_governance_pack(
     pack_name: str,
 ) -> RoutingPolicy:
     pack = governance_policy_pack(pack_name)
-    allowed_hours_utc = (
-        list(range(8, 19))
-        if pack_name == "ops_business_hours"
-        else list(policy.allowed_hours_utc) if policy else []
-    )
+    allowed_hours_utc = list(pack.allowed_hours_utc) if pack.allowed_hours_utc else list(policy.allowed_hours_utc) if policy else []
     provider_weights = (
-        {
-            **(policy.provider_weights if policy else {}),
-            ProviderType.OPENAI: 60,
-            ProviderType.ANTHROPIC: 40,
-        }
-        if pack_name == "balanced_mix"
+        {**(policy.provider_weights if policy else {}), **pack.provider_weights}
+        if pack.provider_weights
         else dict(policy.provider_weights) if policy else {}
+    )
+    fallback_order = (
+        list(dict.fromkeys([*(policy.fallback_order if policy else []), *pack.fallback_order]))
+        if pack.fallback_order
+        else list(policy.fallback_order) if policy else []
+    )
+    max_total_cost_usd = pack.max_total_cost_usd if pack.max_total_cost_usd is not None else policy.max_total_cost_usd if policy else None
+    max_requests_per_minute = (
+        pack.max_requests_per_minute
+        if pack.max_requests_per_minute is not None
+        else policy.max_requests_per_minute if policy else None
     )
     if policy is None:
         return RoutingPolicy(
+            fallback_order=fallback_order,
+            max_total_cost_usd=max_total_cost_usd,
+            max_requests_per_minute=max_requests_per_minute,
             allowed_hours_utc=allowed_hours_utc,
             provider_weights=provider_weights,
             governance=GovernancePolicyPack(rules=list(pack.rules)),
@@ -109,9 +156,9 @@ def apply_governance_pack(
     existing = list(policy.governance.rules) if policy.governance else []
     return RoutingPolicy(
         aliases=dict(policy.aliases),
-        fallback_order=list(policy.fallback_order),
-        max_total_cost_usd=policy.max_total_cost_usd,
-        max_requests_per_minute=policy.max_requests_per_minute,
+        fallback_order=fallback_order,
+        max_total_cost_usd=max_total_cost_usd,
+        max_requests_per_minute=max_requests_per_minute,
         allowed_hours_utc=allowed_hours_utc,
         provider_weights=provider_weights,
         governance=GovernancePolicyPack(rules=[*existing, *pack.rules]),
@@ -356,6 +403,21 @@ def explain_routing_target(
         return fail("selection", exc)
 
 
+def _coerce_provider(value: Any) -> ProviderType:
+    if isinstance(value, ProviderType):
+        return value
+    return ProviderType(str(value))
+
+
+def _normalize_policy_scenario(index: int, scenario: dict[str, Any]) -> tuple[ProviderType, str, dict[str, Any]]:
+    provider = _coerce_provider(scenario.get("provider", ProviderType.OPENAI))
+    model = str(scenario.get("model", "gpt-5.2"))
+    options = scenario.get("options")
+    if options is not None and not isinstance(options, dict):
+        raise ValueError(f"scenario {index} options must be a dict")
+    return provider, model, options or {}
+
+
 def evaluate_policy_gate(
     policy: RoutingPolicy | None,
     scenarios: list[dict[str, Any]],
@@ -363,17 +425,8 @@ def evaluate_policy_gate(
     results: list[dict[str, Any]] = []
     failed_indexes: list[int] = []
     for index, scenario in enumerate(scenarios):
-        provider_raw = scenario.get("provider", ProviderType.OPENAI)
-        provider = (
-            provider_raw
-            if isinstance(provider_raw, ProviderType)
-            else ProviderType(str(provider_raw))
-        )
-        model = str(scenario.get("model", "gpt-5.2"))
-        options = scenario.get("options")
-        if options is not None and not isinstance(options, dict):
-            raise ValueError(f"scenario {index} options must be a dict")
-        explanation = explain_routing_target(policy, provider, model, **(options or {}))
+        provider, model, options = _normalize_policy_scenario(index, scenario)
+        explanation = explain_routing_target(policy, provider, model, **options)
         results.append(explanation)
         if not explanation.get("ok"):
             failed_indexes.append(index)
@@ -385,3 +438,81 @@ def evaluate_policy_gate(
         "failed_indexes": failed_indexes,
         "results": results,
     }
+
+
+def evaluate_policy_diff(
+    candidate_policy: RoutingPolicy | None,
+    scenarios: list[dict[str, Any]],
+    baseline_policy: RoutingPolicy | None = None,
+) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    for index, scenario in enumerate(scenarios):
+        provider, model, options = _normalize_policy_scenario(index, scenario)
+        baseline = explain_routing_target(baseline_policy, provider, model, **options)
+        candidate = explain_routing_target(candidate_policy, provider, model, **options)
+        changed = (
+            baseline.get("ok") != candidate.get("ok")
+            or (baseline.get("decision") or {}).get("provider") != (candidate.get("decision") or {}).get("provider")
+            or (baseline.get("decision") or {}).get("model") != (candidate.get("decision") or {}).get("model")
+            or (baseline.get("decision") or {}).get("selected_by") != (candidate.get("decision") or {}).get("selected_by")
+            or baseline.get("error") != candidate.get("error")
+        )
+        results.append(
+            {
+                "index": index,
+                "input": {"provider": provider.value, "model": model},
+                "baseline": baseline,
+                "candidate": candidate,
+                "changed": changed,
+            }
+        )
+    regressions = sum(
+        1
+        for item in results
+        if bool(item["baseline"].get("ok")) and not bool(item["candidate"].get("ok"))
+    )
+    return {
+        "total": len(results),
+        "baseline_passed": sum(1 for item in results if item["baseline"].get("ok")),
+        "candidate_passed": sum(1 for item in results if item["candidate"].get("ok")),
+        "changed": sum(1 for item in results if item["changed"]),
+        "regressions": regressions,
+        "results": results,
+    }
+
+
+def evaluate_policy_rollout_guardrails(
+    diff: dict[str, Any],
+    guardrails: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    rules = guardrails or {}
+    total = int(diff.get("total", 0))
+    changed = int(diff.get("changed", 0))
+    regressions = int(diff.get("regressions", 0))
+    candidate_passed = int(diff.get("candidate_passed", 0))
+    max_changed = int(rules.get("max_changed", total))
+    max_regressions = int(rules.get("max_regressions", 0))
+    min_candidate_pass_rate = float(rules.get("min_candidate_pass_rate", 1.0))
+    candidate_pass_rate = 1.0 if total == 0 else candidate_passed / total
+
+    checks = [
+        {
+            "check": "changed_budget",
+            "status": "passed" if changed <= max_changed else "failed",
+            "detail": f"changed={changed}, limit={max_changed}",
+        },
+        {
+            "check": "regression_budget",
+            "status": "passed" if regressions <= max_regressions else "failed",
+            "detail": f"regressions={regressions}, limit={max_regressions}",
+        },
+        {
+            "check": "candidate_pass_rate",
+            "status": "passed" if candidate_pass_rate >= min_candidate_pass_rate else "failed",
+            "detail": f"candidate_pass_rate={candidate_pass_rate:.3f}, min={min_candidate_pass_rate:.3f}",
+        },
+    ]
+    failed = next((check for check in checks if check["status"] == "failed"), None)
+    if failed is None:
+        return {"ok": True, "checks": checks}
+    return {"ok": False, "checks": checks, "error": failed["detail"]}

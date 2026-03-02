@@ -490,6 +490,12 @@ class TestAgent:
         assert balanced.provider_weights.get(ProviderType.OPENAI) == 60
         assert balanced.provider_weights.get(ProviderType.ANTHROPIC) == 40
 
+        canary = apply_governance_pack(None, "rollout_canary")
+        assert canary.max_total_cost_usd == 0.1
+        assert canary.max_requests_per_minute == 30
+        assert canary.provider_weights.get(ProviderType.OPENAI) == 70
+        assert ProviderType.ANTHROPIC in canary.fallback_order
+
     def test_explain_routing_target(self) -> None:
         from gauss._types import ProviderType
         from gauss.routing_policy import RoutingPolicy, explain_routing_target
@@ -530,6 +536,35 @@ class TestAgent:
         assert summary["failed"] == 1
         assert summary["failed_indexes"] == [1]
 
+    def test_evaluate_policy_diff_and_rollout_guardrails(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.routing_policy import (
+            RoutingPolicy,
+            evaluate_policy_diff,
+            evaluate_policy_rollout_guardrails,
+        )
+
+        diff = evaluate_policy_diff(
+            RoutingPolicy(allowed_hours_utc=[9, 10, 11]),
+            [
+                {"provider": ProviderType.OPENAI, "model": "gpt-5.2", "options": {"current_hour_utc": 10}},
+                {"provider": ProviderType.OPENAI, "model": "gpt-5.2", "options": {"current_hour_utc": 22}},
+            ],
+        )
+        assert diff["total"] == 2
+        assert diff["candidate_passed"] == 1
+        assert diff["regressions"] == 1
+
+        rollout = evaluate_policy_rollout_guardrails(
+            diff,
+            {"max_changed": 2, "max_regressions": 0, "min_candidate_pass_rate": 0.9},
+        )
+        assert rollout["ok"] is False
+        assert any(
+            check["check"] == "regression_budget" and check["status"] == "failed"
+            for check in rollout["checks"]
+        )
+
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
         from gauss.agent import Agent
@@ -561,7 +596,9 @@ class TestAgent:
             create_tool_executor,
             detect_provider,
             enterprise_run,
+            evaluate_policy_diff,
             evaluate_policy_gate,
+            evaluate_policy_rollout_guardrails,
             get_pricing,
             resolve_api_key,
             set_pricing,
@@ -572,7 +609,9 @@ class TestAgent:
         assert callable(enterprise_run)
         assert callable(detect_provider)
         assert callable(resolve_api_key)
+        assert callable(evaluate_policy_diff)
         assert callable(evaluate_policy_gate)
+        assert callable(evaluate_policy_rollout_guardrails)
         assert callable(create_resilient_agent)
         assert callable(tool)
         assert callable(create_tool_executor)
