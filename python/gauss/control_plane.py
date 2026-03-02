@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import os
 import time
+from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import TYPE_CHECKING, Any
@@ -78,6 +79,9 @@ class ControlPlane:
         self._next_explain_trace_id = 1
         self._explain_traces: list[dict[str, Any]] = []
         self._latest_explain_trace_id: str | None = None
+        self._next_policy_lifecycle_version = 1
+        self._policy_lifecycle_versions: list[dict[str, Any]] = []
+        self._active_policy_version_id: str | None = None
         self._server: ThreadingHTTPServer | None = None
         self._server_thread: Thread | None = None
 
@@ -268,6 +272,31 @@ class ControlPlane:
 
                     if parsed.path == "/api/ops/policy/explain/traces":
                         payload = json.dumps(outer._ops_policy_explain_traces(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/lifecycle/draft":
+                        payload = json.dumps(outer._ops_policy_lifecycle_draft(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/lifecycle/validate":
+                        payload = json.dumps(outer._ops_policy_lifecycle_validate(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/lifecycle/approve":
+                        payload = json.dumps(outer._ops_policy_lifecycle_approve(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/lifecycle/promote":
+                        payload = json.dumps(outer._ops_policy_lifecycle_promote(params), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/lifecycle/versions":
+                        payload = json.dumps(outer._ops_policy_lifecycle_versions(), indent=2).encode("utf-8")
                         self._send_json(payload)
                         return
 
@@ -481,6 +510,14 @@ class ControlPlane:
         except ValueError as exc:
             raise ValidationError(f'Invalid {field} "{raw}"', field) from exc
 
+    def _require_non_empty_string(self, raw: Any, *, field: str) -> str:
+        if not isinstance(raw, str):
+            raise ValidationError(f"{field} must be a string", field)
+        value = raw.strip()
+        if not value:
+            raise ValidationError(f"{field} must not be empty", field)
+        return value
+
     def _parse_policy_explain_options(
         self,
         params: dict[str, list[str]],
@@ -558,6 +595,265 @@ class ControlPlane:
                 raise ValidationError(f"Scenario {index} must be an object", "scenarios")
             out.append(self._parse_policy_explain_scenario(item))
         return out
+
+    def _parse_policy_provider_list(self, value: Any, field: str) -> list[ProviderType]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise ValidationError(f"{field} must be an array", field)
+        out: list[ProviderType] = []
+        for index, item in enumerate(value):
+            out.append(self._parse_policy_provider(self._require_non_empty_string(item, field=f"{field}[{index}]")))
+        return out
+
+    def _parse_policy_hour_list(self, value: Any, field: str) -> list[int]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise ValidationError(f"{field} must be an array", field)
+        out: list[int] = []
+        for index, item in enumerate(value):
+            out.append(self._parse_optional_int_value(item, field=f"{field}[{index}]") or 0)
+        return out
+
+    def _parse_policy_provider_weights(self, value: Any, field: str) -> dict[ProviderType, int]:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValidationError(f"{field} must be an object", field)
+        out: dict[ProviderType, int] = {}
+        for provider_raw, weight_raw in value.items():
+            provider = self._parse_policy_provider(self._require_non_empty_string(provider_raw, field=field))
+            out[provider] = self._parse_optional_int_value(weight_raw, field=f"{field}.{provider.value}") or 0
+        return out
+
+    def _parse_policy_lifecycle_policy(self, params: dict[str, list[str]]) -> "RoutingPolicy":
+        from gauss.routing_policy import GovernancePolicyPack, GovernanceRule, RoutingCandidate, RoutingPolicy
+
+        raw = params.get("policy", [None])[0]
+        if raw is None or raw == "":
+            raise ValidationError("Missing policy query parameter", "policy")
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValidationError("Invalid policy JSON payload", "policy") from exc
+        if not isinstance(parsed, dict):
+            raise ValidationError("policy must be a JSON object", "policy")
+
+        aliases_raw = parsed.get("aliases")
+        aliases: dict[str, list[RoutingCandidate]] = {}
+        if aliases_raw is not None:
+            if not isinstance(aliases_raw, dict):
+                raise ValidationError("aliases must be an object", "aliases")
+            for alias, candidates in aliases_raw.items():
+                alias_name = self._require_non_empty_string(alias, field="aliases")
+                if not isinstance(candidates, list):
+                    raise ValidationError(f"aliases.{alias_name} must be an array", f"aliases.{alias_name}")
+                parsed_candidates: list[RoutingCandidate] = []
+                for index, candidate in enumerate(candidates):
+                    if not isinstance(candidate, dict):
+                        raise ValidationError(
+                            f"aliases.{alias_name}[{index}] must be an object",
+                            f"aliases.{alias_name}[{index}]",
+                        )
+                    provider = self._parse_policy_provider(
+                        self._require_non_empty_string(
+                            candidate.get("provider"),
+                            field=f"aliases.{alias_name}[{index}].provider",
+                        )
+                    )
+                    model = self._require_non_empty_string(
+                        candidate.get("model"),
+                        field=f"aliases.{alias_name}[{index}].model",
+                    )
+                    priority = self._parse_optional_int_value(
+                        candidate.get("priority"),
+                        field=f"aliases.{alias_name}[{index}].priority",
+                    )
+                    max_cost_usd = self._parse_optional_float_value(
+                        candidate.get("max_cost_usd"),
+                        field=f"aliases.{alias_name}[{index}].max_cost_usd",
+                    )
+                    parsed_candidates.append(
+                        RoutingCandidate(
+                            provider=provider,
+                            model=model,
+                            priority=priority or 0,
+                            max_cost_usd=max_cost_usd,
+                        )
+                    )
+                aliases[alias_name] = parsed_candidates
+
+        governance_raw = parsed.get("governance")
+        governance: GovernancePolicyPack | None = None
+        if governance_raw is not None:
+            if not isinstance(governance_raw, dict):
+                raise ValidationError("governance must be an object", "governance")
+            rules_raw = governance_raw.get("rules")
+            if rules_raw is None:
+                rules_raw = []
+            if not isinstance(rules_raw, list):
+                raise ValidationError("governance.rules must be an array", "governance.rules")
+            rules: list[GovernanceRule] = []
+            for index, item in enumerate(rules_raw):
+                if not isinstance(item, dict):
+                    raise ValidationError(
+                        f"governance.rules[{index}] must be an object",
+                        f"governance.rules[{index}]",
+                    )
+                rule_type = self._require_non_empty_string(item.get("type"), field=f"governance.rules[{index}].type")
+                tag_raw = item.get("tag")
+                if tag_raw is not None and not isinstance(tag_raw, str):
+                    raise ValidationError(f"governance.rules[{index}].tag must be a string", "governance.rules")
+                provider_raw = item.get("provider")
+                provider = (
+                    self._parse_policy_provider(
+                        self._require_non_empty_string(provider_raw, field=f"governance.rules[{index}].provider")
+                    )
+                    if provider_raw is not None
+                    else None
+                )
+                rules.append(GovernanceRule(type=rule_type, tag=tag_raw, provider=provider))
+            governance = GovernancePolicyPack(
+                rules=rules,
+                max_total_cost_usd=self._parse_optional_float_value(
+                    governance_raw.get("max_total_cost_usd"),
+                    field="governance.max_total_cost_usd",
+                ),
+                max_requests_per_minute=self._parse_optional_int_value(
+                    governance_raw.get("max_requests_per_minute"),
+                    field="governance.max_requests_per_minute",
+                ),
+                allowed_hours_utc=self._parse_policy_hour_list(
+                    governance_raw.get("allowed_hours_utc"),
+                    field="governance.allowed_hours_utc",
+                ),
+                provider_weights=self._parse_policy_provider_weights(
+                    governance_raw.get("provider_weights"),
+                    field="governance.provider_weights",
+                ),
+                fallback_order=self._parse_policy_provider_list(
+                    governance_raw.get("fallback_order"),
+                    field="governance.fallback_order",
+                ),
+            )
+
+        return RoutingPolicy(
+            aliases=aliases,
+            fallback_order=self._parse_policy_provider_list(parsed.get("fallback_order"), field="fallback_order"),
+            max_total_cost_usd=self._parse_optional_float_value(
+                parsed.get("max_total_cost_usd"),
+                field="max_total_cost_usd",
+            ),
+            max_requests_per_minute=self._parse_optional_int_value(
+                parsed.get("max_requests_per_minute"),
+                field="max_requests_per_minute",
+            ),
+            allowed_hours_utc=self._parse_policy_hour_list(parsed.get("allowed_hours_utc"), field="allowed_hours_utc"),
+            provider_weights=self._parse_policy_provider_weights(parsed.get("provider_weights"), field="provider_weights"),
+            governance=governance,
+        )
+
+    def _summarize_policy_lifecycle_version(self, version: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "version_id": version["version_id"],
+            "status": version["status"],
+            "created_at": version["created_at"],
+            "validated_at": version.get("validated_at"),
+            "approved_at": version.get("approved_at"),
+            "promoted_at": version.get("promoted_at"),
+            "has_validation": version.get("validation") is not None,
+            "validation": version.get("validation"),
+        }
+
+    def _find_policy_lifecycle_version(self, version_id: str) -> dict[str, Any]:
+        for item in self._policy_lifecycle_versions:
+            if item["version_id"] == version_id:
+                return item
+        raise ValidationError(f'Unknown lifecycle version "{version_id}"', "version")
+
+    def _ops_policy_lifecycle_draft(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        version = {
+            "version_id": f"policy-v{self._next_policy_lifecycle_version}",
+            "status": "draft",
+            "created_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "policy": deepcopy(self._parse_policy_lifecycle_policy(params)),
+            "validation": None,
+        }
+        self._next_policy_lifecycle_version += 1
+        self._policy_lifecycle_versions.append(version)
+        return {"ok": True, "version": self._summarize_policy_lifecycle_version(version)}
+
+    def _ops_policy_lifecycle_validate(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        from gauss.routing_policy import evaluate_policy_gate
+
+        version_id = params.get("version", [None])[0]
+        if version_id is None or version_id == "":
+            raise ValidationError("Missing version query parameter", "version")
+        version = self._find_policy_lifecycle_version(version_id)
+        scenarios = self._parse_policy_explain_batch_scenarios(params)
+        gate_scenarios = [
+            {"provider": provider, "model": model, "options": options}
+            for provider, model, options in scenarios
+        ]
+        validation = evaluate_policy_gate(version["policy"], gate_scenarios)
+        version["validation"] = validation
+        if int(validation.get("failed", 0)) == 0:
+            version["status"] = "validated"
+            version["validated_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        return {
+            "ok": int(validation.get("failed", 0)) == 0,
+            "version": self._summarize_policy_lifecycle_version(version),
+            "validation": validation,
+        }
+
+    def _ops_policy_lifecycle_approve(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        version_id = params.get("version", [None])[0]
+        if version_id is None or version_id == "":
+            raise ValidationError("Missing version query parameter", "version")
+        version = self._find_policy_lifecycle_version(version_id)
+        validation = version.get("validation") or {}
+        if version.get("status") != "validated" or int(validation.get("failed", 1)) > 0:
+            return {
+                "ok": False,
+                "version": self._summarize_policy_lifecycle_version(version),
+                "error": "version must pass validation before approval",
+            }
+        version["status"] = "approved"
+        version["approved_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        return {"ok": True, "version": self._summarize_policy_lifecycle_version(version)}
+
+    def _ops_policy_lifecycle_promote(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        version_id = params.get("version", [None])[0]
+        if version_id is None or version_id == "":
+            raise ValidationError("Missing version query parameter", "version")
+        version = self._find_policy_lifecycle_version(version_id)
+        if version.get("status") != "approved":
+            return {
+                "ok": False,
+                "active_version_id": self._active_policy_version_id,
+                "version": self._summarize_policy_lifecycle_version(version),
+                "error": "version must be approved before promotion",
+            }
+        for item in self._policy_lifecycle_versions:
+            if item["version_id"] != version_id and item.get("status") == "promoted":
+                item["status"] = "approved"
+        version["status"] = "promoted"
+        version["promoted_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        self._active_policy_version_id = version_id
+        self._routing_policy = deepcopy(version["policy"])
+        return {
+            "ok": True,
+            "active_version_id": self._active_policy_version_id,
+            "version": self._summarize_policy_lifecycle_version(version),
+        }
+
+    def _ops_policy_lifecycle_versions(self) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "active_version_id": self._active_policy_version_id,
+            "versions": [self._summarize_policy_lifecycle_version(item) for item in self._policy_lifecycle_versions],
+        }
 
     def _ops_policy_explain(self, params: dict[str, list[str]]) -> dict[str, Any]:
         from gauss.routing_policy import explain_routing_target
@@ -908,6 +1204,7 @@ class ControlPlane:
             "supports_policy_explain_batch": True,
             "supports_policy_explain_traces": True,
             "supports_policy_explain_diff": True,
+            "supports_policy_lifecycle": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
             "policy_explain_path": "/api/ops/policy/explain",
@@ -915,6 +1212,7 @@ class ControlPlane:
             "policy_explain_simulate_path": "/api/ops/policy/explain/simulate",
             "policy_explain_trace_path": "/api/ops/policy/explain/traces",
             "policy_explain_diff_path": "/api/ops/policy/explain/diff",
+            "policy_lifecycle_base_path": "/api/ops/policy/lifecycle",
         }
 
     def _ops_health(self) -> dict[str, Any]:

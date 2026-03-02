@@ -76,6 +76,7 @@ class TestControlPlane:
             assert caps["supports_policy_explain_batch"] is True
             assert caps["supports_policy_explain_traces"] is True
             assert caps["supports_policy_explain_diff"] is True
+            assert caps["supports_policy_lifecycle"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
             assert caps["policy_explain_path"] == "/api/ops/policy/explain"
@@ -83,6 +84,7 @@ class TestControlPlane:
             assert caps["policy_explain_simulate_path"] == "/api/ops/policy/explain/simulate"
             assert caps["policy_explain_trace_path"] == "/api/ops/policy/explain/traces"
             assert caps["policy_explain_diff_path"] == "/api/ops/policy/explain/diff"
+            assert caps["policy_lifecycle_base_path"] == "/api/ops/policy/lifecycle"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -150,6 +152,48 @@ class TestControlPlane:
             assert any(item["mode"] == "batch" for item in traces["traces"])
             assert any(item["mode"] == "simulate" for item in traces["traces"])
             assert any(item["mode"] == "diff" for item in traces["traces"])
+
+        lifecycle_policy = urllib.parse.quote(
+            json.dumps(
+                {
+                    "allowed_hours_utc": [10],
+                    "max_total_cost_usd": 0.2,
+                    "governance": {"rules": [{"type": "require_tag", "tag": "rollout"}]},
+                }
+            )
+        )
+        with urllib.request.urlopen(f"{url}/api/ops/policy/lifecycle/draft?policy={lifecycle_policy}") as resp:
+            draft = json.loads(resp.read().decode("utf-8"))
+            assert draft["ok"] is True
+            assert draft["version"]["status"] == "draft"
+            version_id = draft["version"]["version_id"]
+
+        lifecycle_scenarios = urllib.parse.quote(
+            json.dumps([{"provider": "openai", "model": "gpt-5.2", "hour": 10, "tags": ["rollout"]}])
+        )
+        with urllib.request.urlopen(
+            f"{url}/api/ops/policy/lifecycle/validate?version={version_id}&scenarios={lifecycle_scenarios}"
+        ) as resp:
+            validated = json.loads(resp.read().decode("utf-8"))
+            assert validated["ok"] is True
+            assert validated["version"]["status"] == "validated"
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/lifecycle/approve?version={version_id}") as resp:
+            approved = json.loads(resp.read().decode("utf-8"))
+            assert approved["ok"] is True
+            assert approved["version"]["status"] == "approved"
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/lifecycle/promote?version={version_id}") as resp:
+            promoted = json.loads(resp.read().decode("utf-8"))
+            assert promoted["ok"] is True
+            assert promoted["active_version_id"] == version_id
+            assert promoted["version"]["status"] == "promoted"
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/lifecycle/versions") as resp:
+            versions = json.loads(resp.read().decode("utf-8"))
+            assert versions["ok"] is True
+            assert versions["active_version_id"] == version_id
+            assert any(item["version_id"] == version_id for item in versions["versions"])
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")
