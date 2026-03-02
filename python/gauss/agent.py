@@ -36,9 +36,15 @@ from gauss._types import (
 )
 from gauss.models import OPENAI_DEFAULT
 from gauss.stream import AgentStream
+from gauss.tool import TypedToolDef, create_tool_executor
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from gauss.guardrail import GuardrailChain
+    from gauss.memory import Memory
+    from gauss.mcp_client import McpClient
+    from gauss.middleware import MiddlewareChain
 
 
 def _run_native(func: Any, *args: Any) -> Any:
@@ -131,10 +137,18 @@ class Agent:
         )
 
         self._config = config or AgentConfig(**kwargs)
-        self._tools: list[ToolDef] = list(self._config.tools)
+        self._tools: list[ToolDef | TypedToolDef] = list(self._config.tools)
         self._destroyed = False
         self._destroy_provider = destroy_provider
         self._provider_handle: int | None = None
+
+        # Integration glue (M35)
+        self._middleware: MiddlewareChain | None = None
+        self._guardrails: GuardrailChain | None = None
+        self._memory: Memory | None = None
+        self._session_id: str = ""
+        self._mcp_clients: list[McpClient] = []
+        self._mcp_tools_loaded = False
 
         provider_type, model, api_key = self._config.resolve()
 
@@ -156,6 +170,12 @@ class Agent:
         and returns a structured result including the generated text, token
         usage, and any tool calls requested by the model.
 
+        When memory is attached, previous context is recalled before the
+        run and the conversation is stored after.
+
+        When typed tools (with execute callbacks) are registered, a tool
+        executor is automatically wired.
+
         Args:
             prompt: A plain string (auto-wrapped as a ``user`` message) or
                 a sequence of :class:`Message` / raw ``dict`` objects
@@ -173,22 +193,74 @@ class Agent:
             >>> result = agent.run("What is 2+2?")
             >>> print(result.text)
         """
-        from gauss._native import agent_run
-
         self._check_alive()
+        self._ensure_mcp_tools()
+
         messages = self._normalize_messages(prompt)
+
+        # Memory recall: inject context
+        if self._memory is not None:
+            recalled = self._memory.recall(
+                session_id=self._session_id if self._session_id else "default"
+            )
+            if recalled:
+                context_text = "\n".join(
+                    e.get("content", "") if isinstance(e, dict) else str(e)
+                    for e in recalled
+                )
+                messages = [
+                    {"role": "system", "content": f"Previous context:\n{context_text}"},
+                    *messages,
+                ]
+
+        # Resolve typed tools
+        tool_defs, executor = self._resolve_tools_and_executor()
+
         messages_json = json.dumps(messages)
-        options = self._build_options()
+        options = self._build_options(tool_defs=tool_defs)
 
-        result_json = _run_native(
-            agent_run,
-            self._config.name,
-            self._provider_handle,
-            messages_json,
-            json.dumps(options) if options else None,
-        )
+        if executor:
+            from gauss._native import agent_run_with_tool_executor
 
-        return self._parse_result(json.loads(result_json))
+            result_json = _run_native(
+                agent_run_with_tool_executor,
+                self._config.name,
+                self._provider_handle,
+                messages_json,
+                json.dumps(options) if options else None,
+                executor,
+            )
+        else:
+            from gauss._native import agent_run
+
+            result_json = _run_native(
+                agent_run,
+                self._config.name,
+                self._provider_handle,
+                messages_json,
+                json.dumps(options) if options else None,
+            )
+
+        result = self._parse_result(json.loads(result_json))
+
+        # Memory store: save conversation
+        if self._memory is not None:
+            user_text = prompt if isinstance(prompt, str) else " ".join(
+                m.content if isinstance(m, Message) else m.get("content", "")
+                for m in prompt
+            )
+            self._memory.store_sync(
+                content=user_text,
+                entry_type="conversation",
+                session_id=self._session_id or None,
+            )
+            self._memory.store_sync(
+                content=result.text,
+                entry_type="conversation",
+                session_id=self._session_id or None,
+            )
+
+        return result
 
     def generate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:
         """Generate text and return only the response string.
@@ -440,12 +512,15 @@ class Agent:
 
     # ── Tool Management ────────────────────────────────────────────────
 
-    def add_tool(self, tool: ToolDef) -> Agent:
+    def add_tool(self, tool: ToolDef | TypedToolDef) -> Agent:
         """Register a single tool definition with the agent.
 
+        Accepts both raw :class:`ToolDef` and typed :class:`TypedToolDef`
+        (created with the ``@tool`` decorator). Typed tools with execute
+        callbacks are automatically wired into a tool executor.
+
         Args:
-            tool: A :class:`ToolDef` describing the tool's name,
-                description, and JSON-Schema parameters.
+            tool: A :class:`ToolDef` or :class:`TypedToolDef`.
 
         Returns:
             The same :class:`Agent` instance, allowing method chaining.
@@ -456,11 +531,11 @@ class Agent:
         self._tools.append(tool)
         return self
 
-    def add_tools(self, tools: Sequence[ToolDef]) -> Agent:
+    def add_tools(self, tools: Sequence[ToolDef | TypedToolDef]) -> Agent:
         """Register multiple tool definitions at once.
 
         Args:
-            tools: A sequence of :class:`ToolDef` objects.
+            tools: A sequence of :class:`ToolDef` or :class:`TypedToolDef`.
 
         Returns:
             The same :class:`Agent` instance, allowing method chaining.
@@ -496,6 +571,95 @@ class Agent:
                 setattr(self._config, key, value)
         return self
 
+    # ── Integration Glue (M35) ────────────────────────────────────────
+
+    def with_middleware(self, chain: MiddlewareChain) -> Agent:
+        """Attach a middleware chain (logging, caching, rate limiting).
+
+        Args:
+            chain: A configured :class:`MiddlewareChain` instance.
+
+        Returns:
+            The same :class:`Agent` instance for method chaining.
+
+        Example:
+            >>> from gauss import MiddlewareChain
+            >>> agent.with_middleware(
+            ...     MiddlewareChain().use_logging().use_caching(60000)
+            ... )
+
+        .. versionadded:: 1.2.0
+        """
+        self._middleware = chain
+        return self
+
+    def with_guardrails(self, chain: GuardrailChain) -> Agent:
+        """Attach a guardrail chain (content moderation, PII, validation).
+
+        Args:
+            chain: A configured :class:`GuardrailChain` instance.
+
+        Returns:
+            The same :class:`Agent` instance for method chaining.
+
+        Example:
+            >>> from gauss import GuardrailChain
+            >>> agent.with_guardrails(
+            ...     GuardrailChain().add_pii_detection("redact")
+            ... )
+
+        .. versionadded:: 1.2.0
+        """
+        self._guardrails = chain
+        return self
+
+    def with_memory(self, memory: Memory, session_id: str = "") -> Agent:
+        """Attach memory for automatic conversation history.
+
+        When memory is attached, the agent automatically recalls recent
+        entries before each run and stores the conversation after.
+
+        Args:
+            memory: A :class:`Memory` instance.
+            session_id: Optional session ID for scoping memory entries.
+
+        Returns:
+            The same :class:`Agent` instance for method chaining.
+
+        Example:
+            >>> from gauss import Memory
+            >>> agent.with_memory(Memory(), session_id="sess-1")
+
+        .. versionadded:: 1.2.0
+        """
+        self._memory = memory
+        self._session_id = session_id
+        return self
+
+    def use_mcp_server(self, client: McpClient) -> Agent:
+        """Consume tools from an external MCP server.
+
+        Registers an MCP client whose tools will be loaded and made
+        available to the agent on the first run.
+
+        Args:
+            client: A connected :class:`McpClient` instance.
+
+        Returns:
+            The same :class:`Agent` instance for method chaining.
+
+        Example:
+            >>> from gauss import McpClient
+            >>> mcp = McpClient(command="npx", args=["-y", "@mcp/server-fs"])
+            >>> mcp.connect()
+            >>> agent.use_mcp_server(mcp)
+
+        .. versionadded:: 1.2.0
+        """
+        self._mcp_clients.append(client)
+        self._mcp_tools_loaded = False
+        return self
+
     # ── Lifecycle ──────────────────────────────────────────────────────
 
     def destroy(self) -> None:
@@ -526,11 +690,16 @@ class Agent:
         if self._destroyed or self._provider_handle is None:
             raise RuntimeError("Agent has been destroyed")
 
-    def _build_options(self) -> dict[str, Any]:
+    def _build_options(
+        self, *, tool_defs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Build the options dict from current config (DRY helper)."""
         options: dict[str, Any] = {}
-        if self._tools:
-            options["tools"] = [t.to_dict() for t in self._tools]
+        effective_tools = tool_defs if tool_defs is not None else [
+            t.to_dict() for t in self._tools
+        ]
+        if effective_tools:
+            options["tools"] = effective_tools
         if self._config.system_prompt:
             options["instructions"] = self._config.system_prompt
         if self._config.temperature is not None:
@@ -607,6 +776,36 @@ class Agent:
         """Return the native provider handle for advanced / low-level use."""
         self._check_alive()
         return int(self._provider_handle)
+
+    def _resolve_tools_and_executor(
+        self,
+    ) -> tuple[list[dict[str, Any]], Any]:
+        """Resolve typed tools into plain dicts + an optional executor."""
+        typed_tools = [t for t in self._tools if isinstance(t, TypedToolDef) and t.execute is not None]
+        tool_defs = [t.to_dict() for t in self._tools]
+
+        executor = create_tool_executor(typed_tools) if typed_tools else None
+        return tool_defs, executor
+
+    def _ensure_mcp_tools(self) -> None:
+        """Load tools from all connected MCP clients (lazy, once)."""
+        if self._mcp_tools_loaded or not self._mcp_clients:
+            return
+
+        for client in self._mcp_clients:
+            tools, executor = client.get_tools_with_executor()
+            for t in tools:
+                mcp_tool = TypedToolDef(
+                    name=t.name,
+                    description=t.description,
+                    parameters=t.parameters,
+                    execute=lambda args, _t=t, _exec=executor: json.loads(
+                        _exec(json.dumps({"tool": _t.name, "args": args}))
+                    ),
+                )
+                self._tools.append(mcp_tool)
+
+        self._mcp_tools_loaded = True
 
     @staticmethod
     def _normalize_messages(

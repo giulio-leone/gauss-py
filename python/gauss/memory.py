@@ -90,6 +90,23 @@ class Memory:
         result_json: str = memory_recall(self._handle, json.dumps(options))
         return json.loads(result_json)  # type: ignore[no-any-return]
 
+    def store_sync(
+        self,
+        content: str,
+        entry_type: str = "conversation",
+        session_id: str | None = None,
+    ) -> None:
+        """Store a memory entry with minimal arguments (agent integration helper).
+
+        Args:
+            content: The text content to store.
+            entry_type: Type of memory entry (default: "conversation").
+            session_id: Optional session ID for scoping.
+
+        .. versionadded:: 1.2.0
+        """
+        self.store(entry_type, content, session_id=session_id)  # type: ignore[arg-type]
+
     def clear(self, session_id: str = "default") -> None:
         """Clear memory for a session."""
         from gauss._native import memory_clear

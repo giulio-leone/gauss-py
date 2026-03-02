@@ -180,6 +180,14 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolRegistryEntry": ("gauss.tool_registry", "ToolRegistryEntry"),
     "ToolRegistryExample": ("gauss.tool_registry", "ToolExample"),
     "ToolSearchResult": ("gauss.tool_registry", "ToolSearchResult"),
+    # typed tools (M36)
+    "tool": ("gauss.tool", "tool"),
+    "TypedToolDef": ("gauss.tool", "TypedToolDef"),
+    "create_tool_executor": ("gauss.tool", "create_tool_executor"),
+    # mcp client (M37)
+    "McpClient": ("gauss.mcp_client", "McpClient"),
+    "McpClientConfig": ("gauss.mcp_client", "McpClientConfig"),
+    "McpToolResult": ("gauss.mcp_client", "McpToolResult"),
 }
 
 
