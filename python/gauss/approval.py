@@ -19,7 +19,7 @@ class ApprovalManager:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_approval_manager  # type: ignore[import-not-found]
+        from gauss._native import create_approval_manager
 
         self._handle: int = create_approval_manager()
         self._destroyed = False
@@ -31,7 +31,7 @@ class ApprovalManager:
         session_id: str = "default",
     ) -> str:
         """Create an approval request. Returns the request ID."""
-        from gauss._native import approval_request  # type: ignore[import-not-found]
+        from gauss._native import approval_request
 
         self._check_alive()
         return approval_request(  # type: ignore[no-any-return]
@@ -40,7 +40,7 @@ class ApprovalManager:
 
     def approve(self, request_id: str, modified_args: dict[str, Any] | None = None) -> None:
         """Approve a pending request, optionally with modified arguments."""
-        from gauss._native import approval_approve  # type: ignore[import-not-found]
+        from gauss._native import approval_approve
 
         self._check_alive()
         approval_approve(
@@ -51,14 +51,14 @@ class ApprovalManager:
 
     def deny(self, request_id: str, reason: str | None = None) -> None:
         """Deny a pending request."""
-        from gauss._native import approval_deny  # type: ignore[import-not-found]
+        from gauss._native import approval_deny
 
         self._check_alive()
         approval_deny(self._handle, request_id, reason)
 
     def list_pending(self) -> list[dict[str, Any]]:
         """List all pending approval requests."""
-        from gauss._native import approval_list_pending  # type: ignore[import-not-found]
+        from gauss._native import approval_list_pending
 
         self._check_alive()
         result_json: str = approval_list_pending(self._handle)
@@ -66,7 +66,7 @@ class ApprovalManager:
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_approval_manager  # type: ignore[import-not-found]
+            from gauss._native import destroy_approval_manager
 
             destroy_approval_manager(self._handle)
             self._destroyed = True

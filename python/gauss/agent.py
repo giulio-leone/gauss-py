@@ -125,7 +125,7 @@ class Agent:
             >>> agent = Agent()
             >>> agent = Agent(model="gpt-4o", temperature=0.5)
         """
-        from gauss._native import (  # type: ignore[import-not-found]
+        from gauss._native import (
             create_provider,
             destroy_provider,
         )
@@ -172,7 +172,7 @@ class Agent:
             >>> result = agent.run("What is 2+2?")
             >>> print(result.text)
         """
-        from gauss._native import agent_run  # type: ignore[import-not-found]
+        from gauss._native import agent_run
 
         self._check_alive()
         messages = self._normalize_messages(prompt)
@@ -276,7 +276,7 @@ class Agent:
         Example:
             >>> text = agent.generate("Write a haiku about Rust")
         """
-        from gauss._native import generate  # type: ignore[import-not-found]
+        from gauss._native import generate
 
         self._check_alive()
         messages = self._normalize_messages(prompt)
@@ -309,7 +309,7 @@ class Agent:
             >>> if caps.streaming:
             ...     print("Streaming supported")
         """
-        from gauss._native import get_provider_capabilities  # type: ignore[import-not-found]
+        from gauss._native import get_provider_capabilities
 
         self._check_alive()
         caps_json = get_provider_capabilities(self._provider_handle)

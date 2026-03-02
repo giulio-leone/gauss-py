@@ -88,14 +88,14 @@ class ToolRegistry:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_tool_registry  # type: ignore[import-not-found]
+        from gauss._native import create_tool_registry
 
         self._handle: int = create_tool_registry()
         self._destroyed = False
 
     def add(self, entry: ToolRegistryEntry | dict[str, Any]) -> ToolRegistry:
         """Register a tool. Returns self for chaining."""
-        from gauss._native import tool_registry_add  # type: ignore[import-not-found]
+        from gauss._native import tool_registry_add
 
         self._check_alive()
         entry_dict = entry.to_dict() if isinstance(entry, ToolRegistryEntry) else entry
@@ -104,7 +104,7 @@ class ToolRegistry:
 
     def search(self, query: str) -> list[ToolSearchResult]:
         """Search tools by query (matches name, description, tags)."""
-        from gauss._native import tool_registry_search  # type: ignore[import-not-found]
+        from gauss._native import tool_registry_search
 
         self._check_alive()
         results_json = tool_registry_search(self._handle, query)
@@ -112,7 +112,7 @@ class ToolRegistry:
 
     def by_tag(self, tag: str) -> list[ToolSearchResult]:
         """Find tools by tag."""
-        from gauss._native import tool_registry_by_tag  # type: ignore[import-not-found]
+        from gauss._native import tool_registry_by_tag
 
         self._check_alive()
         results_json = tool_registry_by_tag(self._handle, tag)
@@ -120,7 +120,7 @@ class ToolRegistry:
 
     def list(self) -> list[ToolRegistryEntry]:
         """List all registered tools."""
-        from gauss._native import tool_registry_list  # type: ignore[import-not-found]
+        from gauss._native import tool_registry_list
 
         self._check_alive()
         results_json = tool_registry_list(self._handle)
@@ -128,7 +128,7 @@ class ToolRegistry:
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_tool_registry  # type: ignore[import-not-found]
+            from gauss._native import destroy_tool_registry
 
             destroy_tool_registry(self._handle)
             self._destroyed = True

@@ -43,7 +43,7 @@ class Team:
     """
 
     def __init__(self, name: str) -> None:
-        from gauss._native import create_team  # type: ignore[import-not-found]
+        from gauss._native import create_team
 
         self._handle: int = create_team(name)
         self._destroyed = False
@@ -59,7 +59,7 @@ class Team:
             agent: An Agent instance.
             instructions: Optional override instructions for this agent in the team.
         """
-        from gauss._native import team_add_agent  # type: ignore[import-not-found]
+        from gauss._native import team_add_agent
 
         self._check_alive()
         team_add_agent(self._handle, agent._config.name, agent.handle, instructions)
@@ -72,7 +72,7 @@ class Team:
             s: Either ``"sequential"`` (agents run in order, each sees previous output)
                or ``"parallel"`` (agents run concurrently, results merged).
         """
-        from gauss._native import team_set_strategy  # type: ignore[import-not-found]
+        from gauss._native import team_set_strategy
 
         self._check_alive()
         team_set_strategy(self._handle, s)
@@ -87,7 +87,7 @@ class Team:
         Returns:
             A dict with ``finalText`` and ``results`` (per-agent outputs).
         """
-        from gauss._native import team_run  # type: ignore[import-not-found]
+        from gauss._native import team_run
         from gauss.agent import _run_native
 
         self._check_alive()
@@ -98,7 +98,7 @@ class Team:
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_team  # type: ignore[import-not-found]
+            from gauss._native import destroy_team
 
             destroy_team(self._handle)
             self._destroyed = True

@@ -10,7 +10,7 @@ def parse_agent_config(json_str: str) -> str:
 
         config = parse_agent_config('{"name": "test", "model": "gpt-4o"}')
     """
-    from gauss._native import agent_config_from_json  # type: ignore[import-not-found]
+    from gauss._native import agent_config_from_json
 
     return agent_config_from_json(json_str)  # type: ignore[no-any-return]
 
@@ -22,6 +22,6 @@ def resolve_env(template: str) -> str:
 
         value = resolve_env("${OPENAI_API_KEY}")
     """
-    from gauss._native import agent_config_resolve_env  # type: ignore[import-not-found]
+    from gauss._native import agent_config_resolve_env
 
     return agent_config_resolve_env(template)  # type: ignore[no-any-return]

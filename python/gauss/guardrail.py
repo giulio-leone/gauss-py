@@ -23,7 +23,7 @@ class GuardrailChain:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_guardrail_chain  # type: ignore[import-not-found]
+        from gauss._native import create_guardrail_chain
 
         self._handle: int = create_guardrail_chain()
         self._destroyed = False
@@ -35,7 +35,7 @@ class GuardrailChain:
     ) -> GuardrailChain:
         """Add content moderation guardrail. Returns self."""
         from gauss._native import (
-            guardrail_chain_add_content_moderation,  # type: ignore[import-not-found]
+            guardrail_chain_add_content_moderation,
         )
 
         self._check_alive()
@@ -49,7 +49,7 @@ class GuardrailChain:
     def add_pii_detection(self, action: str = "redact") -> GuardrailChain:
         """Add PII detection guardrail. Returns self."""
         from gauss._native import (
-            guardrail_chain_add_pii_detection,  # type: ignore[import-not-found]
+            guardrail_chain_add_pii_detection,
         )
 
         self._check_alive()
@@ -58,7 +58,7 @@ class GuardrailChain:
 
     def add_token_limit(self, max_input: int = 4000, max_output: int = 2000) -> GuardrailChain:
         """Add token limit guardrail. Returns self."""
-        from gauss._native import guardrail_chain_add_token_limit  # type: ignore[import-not-found]
+        from gauss._native import guardrail_chain_add_token_limit
 
         self._check_alive()
         guardrail_chain_add_token_limit(self._handle, max_input, max_output)
@@ -66,7 +66,7 @@ class GuardrailChain:
 
     def add_regex_filter(self, patterns: list[str]) -> GuardrailChain:
         """Add regex-based content filter. Returns self."""
-        from gauss._native import guardrail_chain_add_regex_filter  # type: ignore[import-not-found]
+        from gauss._native import guardrail_chain_add_regex_filter
 
         self._check_alive()
         guardrail_chain_add_regex_filter(self._handle, json.dumps(patterns))
@@ -74,7 +74,7 @@ class GuardrailChain:
 
     def add_schema(self, schema: dict[str, Any]) -> GuardrailChain:
         """Add JSON schema validation guardrail. Returns self."""
-        from gauss._native import guardrail_chain_add_schema  # type: ignore[import-not-found]
+        from gauss._native import guardrail_chain_add_schema
 
         self._check_alive()
         guardrail_chain_add_schema(self._handle, json.dumps(schema))
@@ -82,7 +82,7 @@ class GuardrailChain:
 
     def list(self) -> list[str]:
         """List active guardrail names."""
-        from gauss._native import guardrail_chain_list  # type: ignore[import-not-found]
+        from gauss._native import guardrail_chain_list
 
         self._check_alive()
         result_json: str = guardrail_chain_list(self._handle)
@@ -90,7 +90,7 @@ class GuardrailChain:
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_guardrail_chain  # type: ignore[import-not-found]
+            from gauss._native import destroy_guardrail_chain
 
             destroy_guardrail_chain(self._handle)
             self._destroyed = True

@@ -29,7 +29,7 @@ class Memory:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_memory  # type: ignore[import-not-found]
+        from gauss._native import create_memory
 
         self._handle: int = create_memory()
         self._destroyed = False
@@ -47,7 +47,7 @@ class Memory:
             mem.store("conversation", "Hello!", session_id="s1")
             mem.store({"id": "m1", "content": "Hi", "entry_type": "conversation", ...})
         """
-        from gauss._native import memory_store  # type: ignore[import-not-found]
+        from gauss._native import memory_store
 
         self._check_alive()
 
@@ -81,7 +81,7 @@ class Memory:
             session_id: Session to recall from.
             limit: Optional max number of entries to return.
         """
-        from gauss._native import memory_recall  # type: ignore[import-not-found]
+        from gauss._native import memory_recall
 
         self._check_alive()
         options: dict[str, Any] = {"sessionId": session_id}
@@ -92,7 +92,7 @@ class Memory:
 
     def clear(self, session_id: str = "default") -> None:
         """Clear memory for a session."""
-        from gauss._native import memory_clear  # type: ignore[import-not-found]
+        from gauss._native import memory_clear
 
         self._check_alive()
         memory_clear(self._handle, session_id)
@@ -100,7 +100,7 @@ class Memory:
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_memory  # type: ignore[import-not-found]
+            from gauss._native import destroy_memory
 
             destroy_memory(self._handle)
             self._destroyed = True

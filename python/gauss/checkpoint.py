@@ -18,21 +18,21 @@ class CheckpointStore:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_checkpoint_store  # type: ignore[import-not-found]
+        from gauss._native import create_checkpoint_store
 
         self._handle: int = create_checkpoint_store()
         self._destroyed = False
 
     def save(self, checkpoint: dict[str, Any]) -> None:
         """Save a checkpoint."""
-        from gauss._native import checkpoint_save  # type: ignore[import-not-found]
+        from gauss._native import checkpoint_save
 
         self._check_alive()
         checkpoint_save(self._handle, json.dumps(checkpoint))
 
     def load(self, checkpoint_id: str) -> dict[str, Any] | None:
         """Load a checkpoint by ID. Returns None if not found."""
-        from gauss._native import checkpoint_load  # type: ignore[import-not-found]
+        from gauss._native import checkpoint_load
 
         self._check_alive()
         result_json: str = checkpoint_load(self._handle, checkpoint_id)
@@ -45,7 +45,7 @@ class CheckpointStore:
         NOTE: `checkpoint_load_latest` is not yet exposed in PyO3 bindings.
         This method currently falls back to `checkpoint_load` with a session prefix.
         """
-        from gauss._native import checkpoint_load  # type: ignore[import-not-found]
+        from gauss._native import checkpoint_load
 
         self._check_alive()
         result_json: str = checkpoint_load(self._handle, f"latest:{session_id}")
@@ -54,7 +54,7 @@ class CheckpointStore:
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_checkpoint_store  # type: ignore[import-not-found]
+            from gauss._native import destroy_checkpoint_store
 
             destroy_checkpoint_store(self._handle)
             self._destroyed = True

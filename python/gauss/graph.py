@@ -28,7 +28,7 @@ class Graph:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_graph  # type: ignore[import-not-found]
+        from gauss._native import create_graph
 
         self._handle: int = create_graph()
         self._destroyed = False
@@ -49,7 +49,7 @@ class Graph:
             instructions: Optional override instructions.
             tools: Optional list of tools for this node.
         """
-        from gauss._native import graph_add_node  # type: ignore[import-not-found]
+        from gauss._native import graph_add_node
 
         self._check_alive()
         tools_json: str | None = None
@@ -78,7 +78,7 @@ class Graph:
             from_node: Source node ID.
             to_node: Target node ID.
         """
-        from gauss._native import graph_add_edge  # type: ignore[import-not-found]
+        from gauss._native import graph_add_edge
 
         self._check_alive()
         graph_add_edge(self._handle, from_node, to_node)
@@ -102,7 +102,7 @@ class Graph:
 
             graph.add_fork("parallel", [agent_a, agent_b], consensus="first")
         """
-        from gauss._native import graph_add_fork_node  # type: ignore[import-not-found]
+        from gauss._native import graph_add_fork_node
 
         self._check_alive()
         agent_defs = []
@@ -130,7 +130,7 @@ class Graph:
         Returns:
             A dict with ``outputs`` (per-node results) and ``final_text``.
         """
-        from gauss._native import graph_run  # type: ignore[import-not-found]
+        from gauss._native import graph_run
         from gauss.agent import _run_native
 
         self._check_alive()
@@ -140,7 +140,7 @@ class Graph:
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_graph  # type: ignore[import-not-found]
+            from gauss._native import destroy_graph
 
             destroy_graph(self._handle)
             self._destroyed = True

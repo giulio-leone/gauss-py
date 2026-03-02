@@ -86,7 +86,7 @@ def execute_code(
         >>> result = execute_code("python", "print(42)")
         >>> assert result.stdout.strip() == "42"
     """
-    from gauss._native import execute_code as _exec  # type: ignore[import-not-found]
+    from gauss._native import execute_code as _exec
 
     result_json = _run_native(_exec, language, code, timeout, None, sandbox)
     data = json.loads(result_json)
@@ -114,7 +114,7 @@ def available_runtimes() -> list[str]:
         >>> "python" in runtimes
         True
     """
-    from gauss._native import available_runtimes as _runtimes  # type: ignore[import-not-found]
+    from gauss._native import available_runtimes as _runtimes
 
     result_json = _run_native(_runtimes)
     return json.loads(result_json)
@@ -165,7 +165,7 @@ def generate_image(
         >>> result = generate_image("A sunset over mountains", model="dall-e-3")
         >>> print(result.images[0].url)
     """
-    from gauss._native import (  # type: ignore[import-not-found]
+    from gauss._native import (
         create_provider,
         destroy_provider,
         generate_image as _gen_image,

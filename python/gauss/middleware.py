@@ -20,14 +20,14 @@ class MiddlewareChain:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_middleware_chain  # type: ignore[import-not-found]
+        from gauss._native import create_middleware_chain
 
         self._handle: int = create_middleware_chain()
         self._destroyed = False
 
     def use_logging(self) -> MiddlewareChain:
         """Add logging middleware. Returns self for chaining."""
-        from gauss._native import middleware_use_logging  # type: ignore[import-not-found]
+        from gauss._native import middleware_use_logging
 
         self._check_alive()
         middleware_use_logging(self._handle)
@@ -39,7 +39,7 @@ class MiddlewareChain:
         Args:
             ttl_ms: Cache time-to-live in milliseconds. Defaults to 60 seconds.
         """
-        from gauss._native import middleware_use_caching  # type: ignore[import-not-found]
+        from gauss._native import middleware_use_caching
 
         self._check_alive()
         middleware_use_caching(self._handle, ttl_ms)
@@ -54,7 +54,7 @@ class MiddlewareChain:
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_middleware_chain  # type: ignore[import-not-found]
+            from gauss._native import destroy_middleware_chain
 
             destroy_middleware_chain(self._handle)
             self._destroyed = True

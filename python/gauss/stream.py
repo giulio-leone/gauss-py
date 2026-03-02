@@ -16,7 +16,7 @@ def parse_partial_json(text: str) -> Any:
         obj = parse_partial_json('{"name": "Jo')
         # Returns: {"name": "Jo"}
     """
-    from gauss._native import py_parse_partial_json  # type: ignore[import-not-found]
+    from gauss._native import py_parse_partial_json
 
     result_json: str = py_parse_partial_json(text)
     return json.loads(result_json)
@@ -152,7 +152,7 @@ class AgentStream:
             provider.  After the iterator is exhausted, :attr:`text`
             contains the full concatenated response.
         """
-        from gauss._native import stream_generate  # type: ignore[import-not-found]
+        from gauss._native import stream_generate
         import inspect
 
         messages_json = json.dumps(self._messages)

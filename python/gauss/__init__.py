@@ -15,27 +15,21 @@ One-liner::
     print(gauss("What is the meaning of life?"))
 """
 
+from __future__ import annotations
+
+import importlib
+from typing import Any
+
+# ── Eager imports: lightweight core that every user needs ──────────────────
 from gauss._types import (
     AgentConfig,
     AgentResult,
     Citation,
-    CodeExecutionOptions,
-    CodeExecutionResult,
-    GeneratedImageData,
-    GroundingChunk,
-    GroundingMetadata,
-    ImageGenerationConfig,
-    ImageGenerationResult,
     Message,
-    ProviderCapabilities,
     ProviderType,
-    SearchResult,
     ToolDef,
 )
 from gauss.agent import Agent, gauss
-from gauss.batch import BatchItem, batch
-from gauss.stream import AgentStream, StreamEvent, parse_partial_json
-from gauss.code_execution import available_runtimes, execute_code, generate_image
 from gauss.models import (
     ANTHROPIC_DEFAULT,
     ANTHROPIC_FAST,
@@ -53,88 +47,149 @@ from gauss.models import (
     PROVIDER_DEFAULTS,
     default_model,
 )
-from gauss.approval import ApprovalManager
-from gauss.checkpoint import CheckpointStore
-from gauss.config import parse_agent_config, resolve_env
-from gauss.eval import EvalRunner
-from gauss.graph import Graph
-from gauss.guardrail import GuardrailChain
-from gauss.mcp import (
-    McpServer,
-    McpResource,
-    McpPrompt,
-    McpPromptArgument,
-    McpContent,
-    McpResourceContent,
-    McpPromptMessage,
-    McpPromptResult,
-    McpModelHint,
-    McpModelPreferences,
-    McpSamplingMessage,
-    McpSamplingRequest,
-    McpSamplingResponse,
-)
-from gauss.memory import Memory
-from gauss.middleware import MiddlewareChain
-from gauss.network import Network
-from gauss.team import Team
-from gauss.pipeline import (
-    compose,
-    compose_async,
-    filter_async,
-    filter_sync,
-    map_async,
-    map_sync,
-    pipe,
-    reduce_async,
-    reduce_sync,
-)
-from gauss.plugin import PluginRegistry
-from gauss.resilience import (
-    create_circuit_breaker,
-    create_fallback_provider,
-    create_resilient_provider,
-)
-from gauss.retry import RetryConfig, retryable, with_retry
-from gauss.structured import StructuredConfig, StructuredResult, structured
-from gauss.telemetry import Telemetry
-from gauss.template import (
-    PromptTemplate,
-    classify,
-    code_review,
-    extract,
-    summarize,
-    template,
-    translate,
-)
-from gauss.tokens import (
-    count_message_tokens,
-    count_tokens,
-    count_tokens_for_model,
-    get_context_window_size,
-)
-from gauss.tool_validator import ToolValidator
-from gauss.vector_store import VectorStore
-from gauss.workflow import Workflow
-from gauss.spec import AgentSpec, AgentToolSpec, SkillSpec, SkillStep, SkillParam, discover_agents
-from gauss.a2a import (
-    A2aClient,
-    A2aMessage,
-    AgentCard,
-    AgentCapabilities,
-    AgentSkill,
-    Artifact,
-    Part,
-    Task,
-    TaskState,
-    TaskStatus,
-)
-from gauss.tool_registry import (
-    ToolRegistry,
-    ToolRegistryEntry,
-    ToolExample as ToolRegistryExample,
-    ToolSearchResult,
-)
+
+# ── Lazy-loading registry: module_path → attr_name ────────────────────────
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    # _types (non-core)
+    "CodeExecutionOptions": ("gauss._types", "CodeExecutionOptions"),
+    "CodeExecutionResult": ("gauss._types", "CodeExecutionResult"),
+    "GeneratedImageData": ("gauss._types", "GeneratedImageData"),
+    "GroundingChunk": ("gauss._types", "GroundingChunk"),
+    "GroundingMetadata": ("gauss._types", "GroundingMetadata"),
+    "ImageGenerationConfig": ("gauss._types", "ImageGenerationConfig"),
+    "ImageGenerationResult": ("gauss._types", "ImageGenerationResult"),
+    "ProviderCapabilities": ("gauss._types", "ProviderCapabilities"),
+    "SearchResult": ("gauss._types", "SearchResult"),
+    # batch
+    "batch": ("gauss.batch", "batch"),
+    "BatchItem": ("gauss.batch", "BatchItem"),
+    # stream
+    "AgentStream": ("gauss.stream", "AgentStream"),
+    "StreamEvent": ("gauss.stream", "StreamEvent"),
+    "parse_partial_json": ("gauss.stream", "parse_partial_json"),
+    # code execution
+    "execute_code": ("gauss.code_execution", "execute_code"),
+    "available_runtimes": ("gauss.code_execution", "available_runtimes"),
+    "generate_image": ("gauss.code_execution", "generate_image"),
+    # approval / hitl
+    "ApprovalManager": ("gauss.approval", "ApprovalManager"),
+    "CheckpointStore": ("gauss.checkpoint", "CheckpointStore"),
+    # config
+    "parse_agent_config": ("gauss.config", "parse_agent_config"),
+    "resolve_env": ("gauss.config", "resolve_env"),
+    # eval
+    "EvalRunner": ("gauss.eval", "EvalRunner"),
+    # graph
+    "Graph": ("gauss.graph", "Graph"),
+    # guardrail
+    "GuardrailChain": ("gauss.guardrail", "GuardrailChain"),
+    # mcp
+    "McpServer": ("gauss.mcp", "McpServer"),
+    "McpResource": ("gauss.mcp", "McpResource"),
+    "McpPrompt": ("gauss.mcp", "McpPrompt"),
+    "McpPromptArgument": ("gauss.mcp", "McpPromptArgument"),
+    "McpContent": ("gauss.mcp", "McpContent"),
+    "McpResourceContent": ("gauss.mcp", "McpResourceContent"),
+    "McpPromptMessage": ("gauss.mcp", "McpPromptMessage"),
+    "McpPromptResult": ("gauss.mcp", "McpPromptResult"),
+    "McpModelHint": ("gauss.mcp", "McpModelHint"),
+    "McpModelPreferences": ("gauss.mcp", "McpModelPreferences"),
+    "McpSamplingMessage": ("gauss.mcp", "McpSamplingMessage"),
+    "McpSamplingRequest": ("gauss.mcp", "McpSamplingRequest"),
+    "McpSamplingResponse": ("gauss.mcp", "McpSamplingResponse"),
+    # memory
+    "Memory": ("gauss.memory", "Memory"),
+    # middleware
+    "MiddlewareChain": ("gauss.middleware", "MiddlewareChain"),
+    # network
+    "Network": ("gauss.network", "Network"),
+    # team
+    "Team": ("gauss.team", "Team"),
+    # pipeline
+    "pipe": ("gauss.pipeline", "pipe"),
+    "map_async": ("gauss.pipeline", "map_async"),
+    "map_sync": ("gauss.pipeline", "map_sync"),
+    "filter_async": ("gauss.pipeline", "filter_async"),
+    "filter_sync": ("gauss.pipeline", "filter_sync"),
+    "reduce_async": ("gauss.pipeline", "reduce_async"),
+    "reduce_sync": ("gauss.pipeline", "reduce_sync"),
+    "compose": ("gauss.pipeline", "compose"),
+    "compose_async": ("gauss.pipeline", "compose_async"),
+    # plugin
+    "PluginRegistry": ("gauss.plugin", "PluginRegistry"),
+    # resilience
+    "create_fallback_provider": ("gauss.resilience", "create_fallback_provider"),
+    "create_circuit_breaker": ("gauss.resilience", "create_circuit_breaker"),
+    "create_resilient_provider": ("gauss.resilience", "create_resilient_provider"),
+    # retry
+    "RetryConfig": ("gauss.retry", "RetryConfig"),
+    "retryable": ("gauss.retry", "retryable"),
+    "with_retry": ("gauss.retry", "with_retry"),
+    # structured
+    "structured": ("gauss.structured", "structured"),
+    "StructuredConfig": ("gauss.structured", "StructuredConfig"),
+    "StructuredResult": ("gauss.structured", "StructuredResult"),
+    # telemetry
+    "Telemetry": ("gauss.telemetry", "Telemetry"),
+    # template
+    "template": ("gauss.template", "template"),
+    "PromptTemplate": ("gauss.template", "PromptTemplate"),
+    "summarize": ("gauss.template", "summarize"),
+    "translate": ("gauss.template", "translate"),
+    "code_review": ("gauss.template", "code_review"),
+    "classify": ("gauss.template", "classify"),
+    "extract": ("gauss.template", "extract"),
+    # tokens
+    "count_tokens": ("gauss.tokens", "count_tokens"),
+    "count_tokens_for_model": ("gauss.tokens", "count_tokens_for_model"),
+    "count_message_tokens": ("gauss.tokens", "count_message_tokens"),
+    "get_context_window_size": ("gauss.tokens", "get_context_window_size"),
+    # tool_validator
+    "ToolValidator": ("gauss.tool_validator", "ToolValidator"),
+    # vector_store
+    "VectorStore": ("gauss.vector_store", "VectorStore"),
+    # workflow
+    "Workflow": ("gauss.workflow", "Workflow"),
+    # spec
+    "AgentSpec": ("gauss.spec", "AgentSpec"),
+    "AgentToolSpec": ("gauss.spec", "AgentToolSpec"),
+    "SkillSpec": ("gauss.spec", "SkillSpec"),
+    "SkillStep": ("gauss.spec", "SkillStep"),
+    "SkillParam": ("gauss.spec", "SkillParam"),
+    "discover_agents": ("gauss.spec", "discover_agents"),
+    # a2a
+    "A2aClient": ("gauss.a2a", "A2aClient"),
+    "A2aMessage": ("gauss.a2a", "A2aMessage"),
+    "AgentCard": ("gauss.a2a", "AgentCard"),
+    "AgentCapabilities": ("gauss.a2a", "AgentCapabilities"),
+    "AgentSkill": ("gauss.a2a", "AgentSkill"),
+    "Artifact": ("gauss.a2a", "Artifact"),
+    "Part": ("gauss.a2a", "Part"),
+    "Task": ("gauss.a2a", "Task"),
+    "TaskState": ("gauss.a2a", "TaskState"),
+    "TaskStatus": ("gauss.a2a", "TaskStatus"),
+    # tool_registry
+    "ToolRegistry": ("gauss.tool_registry", "ToolRegistry"),
+    "ToolRegistryEntry": ("gauss.tool_registry", "ToolRegistryEntry"),
+    "ToolRegistryExample": ("gauss.tool_registry", "ToolExample"),
+    "ToolSearchResult": ("gauss.tool_registry", "ToolSearchResult"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY_IMPORTS:
+        module_path, attr = _LAZY_IMPORTS[name]
+        mod = importlib.import_module(module_path)
+        # Cache all lazy names from the same module to avoid submodule shadowing
+        for k, (mp, a) in _LAZY_IMPORTS.items():
+            if mp == module_path:
+                globals()[k] = getattr(mod, a)
+        return globals()[name]
+    raise AttributeError(f"module 'gauss' has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return list(globals().keys()) + list(_LAZY_IMPORTS.keys())
 
 __all__ = [
     # One-liner

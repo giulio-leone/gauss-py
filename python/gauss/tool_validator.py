@@ -19,14 +19,14 @@ class ToolValidator:
     """
 
     def __init__(self, strategies: list[str] | None = None) -> None:
-        from gauss._native import create_tool_validator  # type: ignore[import-not-found]
+        from gauss._native import create_tool_validator
 
         self._handle: int = create_tool_validator(strategies)
         self._destroyed = False
 
     def validate(self, input_data: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
         """Validate input against schema. Returns validation result."""
-        from gauss._native import tool_validator_validate  # type: ignore[import-not-found]
+        from gauss._native import tool_validator_validate
 
         self._check_alive()
         result_json: str = tool_validator_validate(
@@ -36,7 +36,7 @@ class ToolValidator:
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_tool_validator  # type: ignore[import-not-found]
+            from gauss._native import destroy_tool_validator
 
             destroy_tool_validator(self._handle)
             self._destroyed = True

@@ -21,14 +21,14 @@ class PluginRegistry:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_plugin_registry  # type: ignore[import-not-found]
+        from gauss._native import create_plugin_registry
 
         self._handle: int = create_plugin_registry()
         self._destroyed = False
 
     def add_telemetry(self) -> PluginRegistry:
         """Register the built-in telemetry plugin. Returns self."""
-        from gauss._native import plugin_registry_add_telemetry  # type: ignore[import-not-found]
+        from gauss._native import plugin_registry_add_telemetry
 
         self._check_alive()
         plugin_registry_add_telemetry(self._handle)
@@ -36,7 +36,7 @@ class PluginRegistry:
 
     def add_memory(self) -> PluginRegistry:
         """Register the built-in memory plugin. Returns self."""
-        from gauss._native import plugin_registry_add_memory  # type: ignore[import-not-found]
+        from gauss._native import plugin_registry_add_memory
 
         self._check_alive()
         plugin_registry_add_memory(self._handle)
@@ -44,7 +44,7 @@ class PluginRegistry:
 
     def list(self) -> list[str]:
         """List registered plugin names."""
-        from gauss._native import plugin_registry_list  # type: ignore[import-not-found]
+        from gauss._native import plugin_registry_list
 
         self._check_alive()
         result_json: str = plugin_registry_list(self._handle)
@@ -52,14 +52,14 @@ class PluginRegistry:
 
     def emit(self, event: dict[str, Any]) -> None:
         """Emit an event to all registered plugins."""
-        from gauss._native import plugin_registry_emit  # type: ignore[import-not-found]
+        from gauss._native import plugin_registry_emit
 
         self._check_alive()
         plugin_registry_emit(self._handle, json.dumps(event))
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_plugin_registry  # type: ignore[import-not-found]
+            from gauss._native import destroy_plugin_registry
 
             destroy_plugin_registry(self._handle)
             self._destroyed = True

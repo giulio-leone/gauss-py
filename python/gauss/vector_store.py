@@ -34,14 +34,14 @@ class VectorStore:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_vector_store  # type: ignore[import-not-found]
+        from gauss._native import create_vector_store
 
         self._handle: int = create_vector_store()
         self._destroyed = False
 
     def upsert(self, chunks: list[Chunk | dict[str, Any]]) -> None:
         """Upsert document chunks into the store."""
-        from gauss._native import vector_store_upsert  # type: ignore[import-not-found]
+        from gauss._native import vector_store_upsert
 
         self._check_alive()
         items = []
@@ -67,7 +67,7 @@ class VectorStore:
         Returns:
             List of SearchResult ordered by similarity score (descending).
         """
-        from gauss._native import vector_store_search  # type: ignore[import-not-found]
+        from gauss._native import vector_store_search
 
         self._check_alive()
         result_json: str = vector_store_search(self._handle, json.dumps(embedding), top_k)
@@ -85,14 +85,14 @@ class VectorStore:
     @staticmethod
     def cosine_similarity(a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors."""
-        from gauss._native import cosine_similarity  # type: ignore[import-not-found]
+        from gauss._native import cosine_similarity
 
         return cosine_similarity(json.dumps(a), json.dumps(b))  # type: ignore[no-any-return]
 
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_vector_store  # type: ignore[import-not-found]
+            from gauss._native import destroy_vector_store
 
             destroy_vector_store(self._handle)
             self._destroyed = True

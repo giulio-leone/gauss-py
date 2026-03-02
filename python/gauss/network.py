@@ -28,7 +28,7 @@ class Network:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_network  # type: ignore[import-not-found]
+        from gauss._native import create_network
 
         self._handle: int = create_network()
         self._destroyed = False
@@ -46,7 +46,7 @@ class Network:
             card_json: Optional A2A agent card as JSON string.
             connections: Optional list of connected agent names.
         """
-        from gauss._native import network_add_agent  # type: ignore[import-not-found]
+        from gauss._native import network_add_agent
 
         self._check_alive()
         network_add_agent(
@@ -60,7 +60,7 @@ class Network:
 
     def set_supervisor(self, name: str) -> Network:
         """Set the supervisor agent by name. Returns self for chaining."""
-        from gauss._native import network_set_supervisor  # type: ignore[import-not-found]
+        from gauss._native import network_set_supervisor
 
         self._check_alive()
         network_set_supervisor(self._handle, name)
@@ -80,7 +80,7 @@ class Network:
         Returns:
             The delegation result as a dict.
         """
-        from gauss._native import network_delegate  # type: ignore[import-not-found]
+        from gauss._native import network_delegate
         from gauss.agent import _run_native
 
         self._check_alive()
@@ -94,7 +94,7 @@ class Network:
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_network  # type: ignore[import-not-found]
+            from gauss._native import destroy_network
 
             destroy_network(self._handle)
             self._destroyed = True

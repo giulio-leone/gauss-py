@@ -28,7 +28,7 @@ class Workflow:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_workflow  # type: ignore[import-not-found]
+        from gauss._native import create_workflow
 
         self._handle: int = create_workflow()
         self._destroyed = False
@@ -49,7 +49,7 @@ class Workflow:
             instructions: Optional override instructions.
             tools: Optional list of tools for this step.
         """
-        from gauss._native import workflow_add_step  # type: ignore[import-not-found]
+        from gauss._native import workflow_add_step
 
         self._check_alive()
         tools_json: str | None = None
@@ -78,7 +78,7 @@ class Workflow:
             step_id: The step that has a dependency.
             depends_on: The step it depends on.
         """
-        from gauss._native import workflow_add_dependency  # type: ignore[import-not-found]
+        from gauss._native import workflow_add_dependency
 
         self._check_alive()
         workflow_add_dependency(self._handle, step_id, depends_on)
@@ -93,7 +93,7 @@ class Workflow:
         Returns:
             A dict with ``steps`` containing per-step results.
         """
-        from gauss._native import workflow_run  # type: ignore[import-not-found]
+        from gauss._native import workflow_run
         from gauss.agent import _run_native
 
         self._check_alive()
@@ -103,7 +103,7 @@ class Workflow:
     def destroy(self) -> None:
         """Release native resources."""
         if not self._destroyed:
-            from gauss._native import destroy_workflow  # type: ignore[import-not-found]
+            from gauss._native import destroy_workflow
 
             destroy_workflow(self._handle)
             self._destroyed = True

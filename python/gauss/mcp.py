@@ -258,14 +258,14 @@ class McpServer:
     """
 
     def __init__(self, name: str, version: str = "1.0.0") -> None:
-        from gauss._native import create_mcp_server  # type: ignore[import-not-found]
+        from gauss._native import create_mcp_server
 
         self._handle: int = create_mcp_server(name, version)
         self._destroyed = False
 
     def add_tool(self, tool: ToolDef | dict[str, Any]) -> McpServer:
         """Register a tool. Returns self for chaining."""
-        from gauss._native import mcp_server_add_tool  # type: ignore[import-not-found]
+        from gauss._native import mcp_server_add_tool
 
         self._check_alive()
         tool_dict = tool.to_dict() if isinstance(tool, ToolDef) else tool
@@ -274,7 +274,7 @@ class McpServer:
 
     def add_resource(self, resource: McpResource | dict[str, Any]) -> McpServer:
         """Register a resource. Returns self for chaining."""
-        from gauss._native import mcp_server_add_resource  # type: ignore[import-not-found]
+        from gauss._native import mcp_server_add_resource
 
         self._check_alive()
         res_dict = resource.to_dict() if isinstance(resource, McpResource) else resource
@@ -283,7 +283,7 @@ class McpServer:
 
     def add_prompt(self, prompt: McpPrompt | dict[str, Any]) -> McpServer:
         """Register a prompt. Returns self for chaining."""
-        from gauss._native import mcp_server_add_prompt  # type: ignore[import-not-found]
+        from gauss._native import mcp_server_add_prompt
 
         self._check_alive()
         prompt_dict = prompt.to_dict() if isinstance(prompt, McpPrompt) else prompt
@@ -293,7 +293,7 @@ class McpServer:
     async def handle_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle an incoming MCP JSON-RPC message."""
         import inspect
-        from gauss._native import mcp_server_handle  # type: ignore[import-not-found]
+        from gauss._native import mcp_server_handle
 
         self._check_alive()
         result = mcp_server_handle(self._handle, json.dumps(message))
@@ -303,7 +303,7 @@ class McpServer:
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_mcp_server  # type: ignore[import-not-found]
+            from gauss._native import destroy_mcp_server
 
             destroy_mcp_server(self._handle)
             self._destroyed = True

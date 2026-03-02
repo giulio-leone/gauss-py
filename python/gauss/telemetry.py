@@ -19,21 +19,21 @@ class Telemetry:
     """
 
     def __init__(self) -> None:
-        from gauss._native import create_telemetry  # type: ignore[import-not-found]
+        from gauss._native import create_telemetry
 
         self._handle: int = create_telemetry()
         self._destroyed = False
 
     def record_span(self, span: dict[str, Any]) -> None:
         """Record a telemetry span."""
-        from gauss._native import telemetry_record_span  # type: ignore[import-not-found]
+        from gauss._native import telemetry_record_span
 
         self._check_alive()
         telemetry_record_span(self._handle, json.dumps(span))
 
     def export_spans(self) -> list[dict[str, Any]]:
         """Export all recorded spans."""
-        from gauss._native import telemetry_export_spans  # type: ignore[import-not-found]
+        from gauss._native import telemetry_export_spans
 
         self._check_alive()
         result_json: str = telemetry_export_spans(self._handle)
@@ -41,7 +41,7 @@ class Telemetry:
 
     def export_metrics(self) -> dict[str, Any]:
         """Export aggregated metrics."""
-        from gauss._native import telemetry_export_metrics  # type: ignore[import-not-found]
+        from gauss._native import telemetry_export_metrics
 
         self._check_alive()
         result_json: str = telemetry_export_metrics(self._handle)
@@ -49,14 +49,14 @@ class Telemetry:
 
     def clear(self) -> None:
         """Clear all recorded telemetry data."""
-        from gauss._native import telemetry_clear  # type: ignore[import-not-found]
+        from gauss._native import telemetry_clear
 
         self._check_alive()
         telemetry_clear(self._handle)
 
     def destroy(self) -> None:
         if not self._destroyed:
-            from gauss._native import destroy_telemetry  # type: ignore[import-not-found]
+            from gauss._native import destroy_telemetry
 
             destroy_telemetry(self._handle)
             self._destroyed = True
