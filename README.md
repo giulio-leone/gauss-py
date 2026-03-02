@@ -256,6 +256,7 @@ print(f"Control Plane: {url}")
 # hosted ops health -> GET {url}/api/ops/health
 # hosted ops summary -> GET {url}/api/ops/summary
 # hosted ops tenant breakdown -> GET {url}/api/ops/tenants
+# hosted policy explain -> GET {url}/api/ops/policy/explain?provider=openai&model=gpt-5.2
 # hosted ops dashboard -> GET {url}/ops
 # hosted tenant dashboard -> GET {url}/ops/tenants
 ```

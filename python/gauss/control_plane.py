@@ -11,16 +11,32 @@ from threading import Thread
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
+from gauss._types import ProviderType
 from gauss.errors import ValidationError
 from gauss.tokens import estimate_cost
 
 if TYPE_CHECKING:
     from gauss.approval import ApprovalManager
+    from gauss.routing_policy import RoutingPolicy
     from gauss.telemetry import Telemetry
 
 
 _SECTION_KEYS = {"spans", "metrics", "pending_approvals", "latest_cost"}
 _STREAM_CHANNELS = {"snapshot", "timeline", "dag"}
+_PROVIDERS = {
+    "openai",
+    "anthropic",
+    "google",
+    "groq",
+    "ollama",
+    "deepseek",
+    "openrouter",
+    "together",
+    "fireworks",
+    "mistral",
+    "perplexity",
+    "xai",
+}
 
 
 class _ControlPlaneForbiddenError(Exception):
@@ -35,6 +51,7 @@ class ControlPlane:
         telemetry: Telemetry | None = None,
         approvals: ApprovalManager | None = None,
         model: str = "gpt-5.2",
+        routing_policy: "RoutingPolicy | None" = None,
         *,
         auth_token: str | None = None,
         auth_claims: dict[str, Any] | None = None,
@@ -46,6 +63,7 @@ class ControlPlane:
         self._telemetry = telemetry
         self._approvals = approvals
         self._model = model
+        self._routing_policy = routing_policy
         self._auth_token = auth_token
         self._auth_claims: dict[str, Any] = dict(auth_claims or {})
         self._persist_path = persist_path
@@ -62,6 +80,10 @@ class ControlPlane:
 
     def with_model(self, model: str) -> "ControlPlane":
         self._model = model
+        return self
+
+    def with_routing_policy(self, routing_policy: "RoutingPolicy | None") -> "ControlPlane":
+        self._routing_policy = routing_policy
         return self
 
     def with_auth_token(self, token: str | None) -> "ControlPlane":
@@ -217,6 +239,11 @@ class ControlPlane:
                     if parsed.path == "/api/ops/tenants":
                         filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         payload = json.dumps(outer._ops_tenants(filters), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
+                    if parsed.path == "/api/ops/policy/explain":
+                        payload = json.dumps(outer._ops_policy_explain(params), indent=2).encode("utf-8")
                         self._send_json(payload)
                         return
 
@@ -386,6 +413,82 @@ class ControlPlane:
             "session_id": params.get("session", [None])[0],
             "run_id": params.get("run", [None])[0],
         }
+
+    def _parse_policy_provider(self, value: str) -> ProviderType:
+        provider = value.strip().lower()
+        if provider not in _PROVIDERS:
+            raise ValidationError(f'Unknown provider "{value}"', "provider")
+        return ProviderType(provider)
+
+    def _parse_optional_float(
+        self,
+        params: dict[str, list[str]],
+        key: str,
+        *,
+        field: str,
+    ) -> float | None:
+        raw = params.get(key, [None])[0]
+        if raw is None or raw == "":
+            return None
+        try:
+            return float(raw)
+        except ValueError as exc:
+            raise ValidationError(f'Invalid {field} "{raw}"', field) from exc
+
+    def _parse_optional_int(
+        self,
+        params: dict[str, list[str]],
+        key: str,
+        *,
+        field: str,
+    ) -> int | None:
+        raw = params.get(key, [None])[0]
+        if raw is None or raw == "":
+            return None
+        try:
+            return int(raw)
+        except ValueError as exc:
+            raise ValidationError(f'Invalid {field} "{raw}"', field) from exc
+
+    def _parse_policy_explain_options(
+        self,
+        params: dict[str, list[str]],
+    ) -> tuple[ProviderType, str, dict[str, Any]]:
+        provider = self._parse_policy_provider(params.get("provider", ["openai"])[0] or "openai")
+        model = params.get("model", ["gpt-5.2"])[0] or "gpt-5.2"
+
+        available_raw = params.get("available", [None])[0]
+        available_providers = (
+            [self._parse_policy_provider(value) for value in available_raw.split(",") if value.strip()]
+            if available_raw
+            else None
+        )
+        tags_raw = params.get("tags", [None])[0]
+        governance_tags = [value.strip() for value in tags_raw.split(",") if value.strip()] if tags_raw else None
+
+        options = {
+            "available_providers": available_providers,
+            "estimated_cost_usd": self._parse_optional_float(params, "cost", field="cost"),
+            "current_requests_per_minute": self._parse_optional_int(params, "rpm", field="rpm"),
+            "current_hour_utc": self._parse_optional_int(params, "hour", field="hour"),
+            "governance_tags": governance_tags,
+        }
+        return provider, model, options
+
+    def _ops_policy_explain(self, params: dict[str, list[str]]) -> dict[str, Any]:
+        from gauss.routing_policy import explain_routing_target
+
+        provider, model, options = self._parse_policy_explain_options(params)
+        return explain_routing_target(
+            self._routing_policy,
+            provider,
+            model,
+            available_providers=options["available_providers"],
+            estimated_cost_usd=options["estimated_cost_usd"],
+            current_requests_per_minute=options["current_requests_per_minute"],
+            current_hour_utc=options["current_hour_utc"],
+            governance_tags=options["governance_tags"],
+        )
 
     def _parse_stream_channel(self, channel: str | None) -> str:
         if channel is None:
@@ -604,8 +707,10 @@ class ControlPlane:
             "supports_channel_rbac": True,
             "supports_ops_summary": True,
             "supports_ops_tenants": True,
+            "supports_policy_explain": True,
             "hosted_dashboard_path": "/ops",
             "hosted_tenant_dashboard_path": "/ops/tenants",
+            "policy_explain_path": "/api/ops/policy/explain",
         }
 
     def _ops_health(self) -> dict[str, Any]:

@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 
 from gauss.control_plane import ControlPlane
+from gauss.routing_policy import RoutingPolicy
 from gauss.tokens import ModelPricing, clear_pricing, set_pricing
 
 
@@ -56,7 +57,11 @@ class TestControlPlane:
         cp.stop_server()
 
     def test_exposes_hosted_ops_capabilities_health_and_dashboard(self):
-        cp = ControlPlane(telemetry=_DummyTelemetry(), approvals=_DummyApprovals())
+        cp = ControlPlane(
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+            routing_policy=RoutingPolicy(fallback_order=["openai"], allowed_hours_utc=[9, 10, 11]),
+        )
         cp.with_context({"tenant_id": "t-1", "session_id": "s-1", "run_id": "r-1"}).snapshot()
         cp.with_context({"tenant_id": "t-2", "session_id": "s-2", "run_id": "r-2"}).snapshot()
         url = cp.start_server(port=0)
@@ -66,8 +71,10 @@ class TestControlPlane:
             assert caps["supports_multiplex"] is True
             assert caps["supports_ops_summary"] is True
             assert caps["supports_ops_tenants"] is True
+            assert caps["supports_policy_explain"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
             assert caps["hosted_tenant_dashboard_path"] == "/ops/tenants"
+            assert caps["policy_explain_path"] == "/api/ops/policy/explain"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
             health = json.loads(resp.read().decode("utf-8"))
@@ -85,6 +92,12 @@ class TestControlPlane:
             assert len(tenants) >= 2
             assert any(item["tenant_id"] == "t-1" for item in tenants)
             assert any(item["tenant_id"] == "t-2" for item in tenants)
+
+        with urllib.request.urlopen(f"{url}/api/ops/policy/explain?provider=openai&model=gpt-5.2&hour=10") as resp:
+            explain = json.loads(resp.read().decode("utf-8"))
+            assert explain["ok"] is True
+            assert explain["decision"]["provider"] == "openai"
+            assert any(item["check"] == "selection" and item["status"] == "passed" for item in explain["checks"])
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")
