@@ -70,3 +70,52 @@ class TestControlPlaneE2E:
             assert len([line for line in f if line.strip()]) > 0
         os.remove(persist_path)
 
+    def test_stream_snapshot_simple_flow(self):
+        cp = ControlPlane(
+            telemetry=_Telemetry(),
+            approvals=_Approvals(),
+        )
+        cp.with_context({"tenant_id": "t-simple", "session_id": "s-simple", "run_id": "r-simple"}).snapshot()
+        url = cp.start_server(port=0)
+        with urllib.request.urlopen(f"{url}/api/stream?channel=snapshot&once=1") as resp:
+            assert resp.status == 200
+            body = resp.read().decode("utf-8")
+            assert "event: snapshot" in body
+            data_line = next((line for line in body.splitlines() if line.startswith("data: ")), None)
+            assert data_line is not None
+            event = json.loads(data_line[6:])
+            assert event["event"] == "snapshot"
+            assert event["payload"]["context"]["tenant_id"] == "t-simple"
+        cp.stop_server()
+
+    def test_stream_timeline_scoped_flow(self):
+        cp = ControlPlane(
+            telemetry=_Telemetry(),
+            approvals=_Approvals(),
+            auth_token="stream-token",
+            auth_claims={
+                "tenant_id": "tenant-a",
+                "allowed_session_ids": ["session-a"],
+            },
+        )
+        cp.with_context({"tenant_id": "tenant-a", "session_id": "session-a", "run_id": "run-a"}).snapshot()
+        url = cp.start_server(port=0)
+
+        with urllib.request.urlopen(f"{url}/api/stream?token=stream-token&channel=timeline&once=1") as resp:
+            assert resp.status == 200
+            body = resp.read().decode("utf-8")
+            data_line = next((line for line in body.splitlines() if line.startswith("data: ")), None)
+            assert data_line is not None
+            event = json.loads(data_line[6:])
+            assert event["event"] == "timeline"
+            assert isinstance(event["payload"], list)
+
+        try:
+            urllib.request.urlopen(
+                f"{url}/api/stream?token=stream-token&channel=timeline&tenant=tenant-b&once=1"
+            )
+            assert False, "Expected forbidden scope"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
+
+        cp.stop_server()

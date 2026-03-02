@@ -176,11 +176,58 @@ class TestControlPlane:
             assert resp.status == 200
             assert "text/event-stream" in (resp.headers.get("Content-Type") or "")
             body = resp.read().decode("utf-8")
+            assert "id: " in body
             assert "event: timeline" in body
             data_line = next((line for line in body.splitlines() if line.startswith("data: ")), None)
             assert data_line is not None
             event = json.loads(data_line[6:])
             assert event["event"] == "timeline"
             assert isinstance(event["payload"], list)
+
+        cp.stop_server()
+
+    def test_stream_supports_multiplex_and_replay_cursor(self):
+        cp = ControlPlane(
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+        )
+
+        url = cp.start_server(port=0)
+        with urllib.request.urlopen(f"{url}/api/stream?channel=snapshot&once=1") as resp:
+            body = resp.read().decode("utf-8")
+            first_id_line = next((line for line in body.splitlines() if line.startswith("id: ")), None)
+            assert first_id_line is not None
+            first_id = int(first_id_line[4:])
+
+        with urllib.request.urlopen(f"{url}/api/stream?channels=snapshot,timeline&once=1") as resp:
+            body = resp.read().decode("utf-8")
+            assert "event: snapshot" in body
+            assert "event: timeline" in body
+
+        with urllib.request.urlopen(f"{url}/api/stream?channel=snapshot&once=1&lastEventId={first_id}") as resp:
+            body = resp.read().decode("utf-8")
+            ids = [int(line[4:]) for line in body.splitlines() if line.startswith("id: ")]
+            assert ids
+            assert all(event_id > first_id for event_id in ids)
+
+        cp.stop_server()
+
+    def test_stream_enforces_channel_rbac_roles(self):
+        cp = ControlPlane(
+            auth_token="claims-token",
+            auth_claims={"roles": ["viewer"]},
+            telemetry=_DummyTelemetry(),
+            approvals=_DummyApprovals(),
+        )
+        url = cp.start_server(port=0)
+
+        with urllib.request.urlopen(f"{url}/api/stream?channel=timeline&once=1&token=claims-token") as resp:
+            assert resp.status == 200
+
+        try:
+            urllib.request.urlopen(f"{url}/api/stream?channel=dag&once=1&token=claims-token")
+            assert False, "Expected forbidden"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
 
         cp.stop_server()

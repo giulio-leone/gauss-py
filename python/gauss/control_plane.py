@@ -40,6 +40,7 @@ class ControlPlane:
         auth_claims: dict[str, Any] | None = None,
         persist_path: str | None = None,
         history_limit: int = 200,
+        stream_replay_limit: int = 500,
         context: dict[str, str] | None = None,
     ) -> None:
         self._telemetry = telemetry
@@ -49,10 +50,13 @@ class ControlPlane:
         self._auth_claims: dict[str, Any] = dict(auth_claims or {})
         self._persist_path = persist_path
         self._history_limit = history_limit
+        self._stream_replay_limit = stream_replay_limit
         self._context: dict[str, str] = dict(context or {})
 
         self._latest_cost: Any = None
         self._history: list[dict[str, Any]] = []
+        self._next_stream_event_id = 1
+        self._stream_events: list[dict[str, Any]] = []
         self._server: ThreadingHTTPServer | None = None
         self._server_thread: Thread | None = None
 
@@ -194,9 +198,12 @@ class ControlPlane:
 
                     if parsed.path == "/api/stream":
                         filters = outer._apply_auth_claims(outer._parse_context_filters(params))
-                        channel = outer._parse_stream_channel(params.get("channel", [None])[0])
+                        channels = outer._parse_stream_channels(params)
+                        for channel in channels:
+                            outer._assert_channel_allowed(channel)
                         once = params.get("once", ["0"])[0] in {"1", "true", "yes"}
                         follow = params.get("follow", ["0"])[0] in {"1", "true", "yes"}
+                        last_event_id = outer._parse_last_event_id(self.headers, params)
                         interval_ms = int(params.get("interval_ms", ["1000"])[0] or "1000")
                         if interval_ms < 100:
                             interval_ms = 100
@@ -208,16 +215,24 @@ class ControlPlane:
                         self.end_headers()
 
                         try:
-                            event = outer._build_stream_event(channel, filters)
-                            self._send_sse_event(channel, event)
+                            replayed = outer._replay_stream_events(channels, filters, last_event_id)
+                            for event in replayed:
+                                self._send_sse_event(event["event"], event)
+                            if once and replayed:
+                                self.wfile.flush()
+                                self.close_connection = True
+                                return
+
+                            for event in outer._emit_stream_batch(channels, filters):
+                                self._send_sse_event(event["event"], event)
                             self.wfile.flush()
                             if once or not follow:
                                 self.close_connection = True
                                 return
                             while True:
                                 time.sleep(interval_ms / 1000.0)
-                                event = outer._build_stream_event(channel, filters)
-                                self._send_sse_event(channel, event)
+                                for event in outer._emit_stream_batch(channels, filters):
+                                    self._send_sse_event(event["event"], event)
                                 self.wfile.flush()
                         except (BrokenPipeError, ConnectionResetError):
                             return
@@ -257,7 +272,11 @@ class ControlPlane:
                 self.wfile.write(payload)
 
             def _send_sse_event(self, event: str, payload: dict[str, Any]) -> None:
-                frame = f"event: {event}\ndata: {json.dumps(payload)}\n\n".encode("utf-8")
+                event_id = payload.get("id")
+                id_frame = f"id: {event_id}\n" if isinstance(event_id, int) else ""
+                frame = f"{id_frame}event: {event}\ndata: {json.dumps(payload)}\n\n".encode(
+                    "utf-8"
+                )
                 self.wfile.write(frame)
 
             def log_message(self, _format: str, *_args: object) -> None:
@@ -333,21 +352,86 @@ class ControlPlane:
             return channel
         raise ValidationError(f'Unknown stream channel "{channel}"', "channel")
 
-    def _build_stream_event(self, channel: str, filters: dict[str, str | None]) -> dict[str, Any]:
-        snap = self._capture_snapshot()
+    def _parse_stream_channels(self, params: dict[str, list[str]]) -> list[str]:
+        channels_param = params.get("channels", [None])[0]
+        if not channels_param:
+            return [self._parse_stream_channel(params.get("channel", [None])[0])]
+        channels = [
+            self._parse_stream_channel(value.strip())
+            for value in channels_param.split(",")
+            if value.strip()
+        ]
+        if not channels:
+            return ["snapshot"]
+        return list(dict.fromkeys(channels))
+
+    def _parse_last_event_id(self, headers: Any, params: dict[str, list[str]]) -> int | None:
+        raw = params.get("lastEventId", [None])[0] or headers.get("Last-Event-ID")
+        if raw is None:
+            return None
+        try:
+            parsed = int(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f'Invalid lastEventId "{raw}"', "lastEventId") from exc
+        if parsed < 0:
+            raise ValidationError(f'Invalid lastEventId "{raw}"', "lastEventId")
+        return parsed
+
+    def _build_stream_event(
+        self,
+        channel: str,
+        filters: dict[str, str | None],
+        snapshot: dict[str, Any],
+    ) -> dict[str, Any]:
         if channel == "timeline":
             payload: Any = self.timeline(filters)
         elif channel == "dag":
             payload = self.dag(filters)
         else:
             filtered = self._filter_history(filters)
-            payload = filtered[-1] if filtered else snap
-        return {
+            payload = filtered[-1] if filtered else snapshot
+        event = {
+            "id": self._next_stream_event_id,
             "event": channel,
-            "generated_at": snap["generated_at"],
-            "context": dict(filters),
+            "generated_at": snapshot["generated_at"],
+            "context": dict(snapshot.get("context", {})),
             "payload": payload,
         }
+        self._next_stream_event_id += 1
+        self._stream_events.append(event)
+        if len(self._stream_events) > self._stream_replay_limit:
+            self._stream_events.pop(0)
+        return event
+
+    def _emit_stream_batch(
+        self,
+        channels: list[str],
+        filters: dict[str, str | None],
+    ) -> list[dict[str, Any]]:
+        snapshot = self._capture_snapshot()
+        return [self._build_stream_event(channel, filters, snapshot) for channel in channels]
+
+    def _replay_stream_events(
+        self,
+        channels: list[str],
+        filters: dict[str, str | None],
+        last_event_id: int | None,
+    ) -> list[dict[str, Any]]:
+        if last_event_id is None:
+            return []
+        tenant_id = filters.get("tenant_id")
+        session_id = filters.get("session_id")
+        run_id = filters.get("run_id")
+        out: list[dict[str, Any]] = []
+        for event in self._stream_events:
+            if int(event.get("id", 0)) <= last_event_id:
+                continue
+            if event.get("event") not in channels:
+                continue
+            if not self._matches_context(event.get("context"), tenant_id, session_id, run_id):
+                continue
+            out.append(event)
+        return out
 
     def _apply_auth_claims(self, filters: dict[str, str | None]) -> dict[str, str | None]:
         if not self._auth_claims:
@@ -415,6 +499,18 @@ class ControlPlane:
                 "run_id": context.get("run_id"),
             }
         )
+
+    def _assert_channel_allowed(self, channel: str) -> None:
+        roles = [str(role).lower() for role in (self._auth_claims.get("roles") or [])]
+        if not roles:
+            return
+        if "admin" in roles or "operator" in roles:
+            return
+        if channel in {"snapshot", "timeline"} and (
+            "viewer" in roles or "reader" in roles
+        ):
+            return
+        raise _ControlPlaneForbiddenError(f'Forbidden stream channel "{channel}"')
 
     def _render_dashboard_html(self) -> str:
         return """<!doctype html>
