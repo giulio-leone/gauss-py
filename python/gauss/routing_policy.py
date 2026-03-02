@@ -40,6 +40,50 @@ class RoutingPolicyError(ValueError):
     """Routing policy rejection."""
 
 
+def governance_policy_pack(name: str) -> GovernancePolicyPack:
+    if name == "enterprise_strict":
+        return GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                GovernanceRule(type="allow_provider", provider=ProviderType.ANTHROPIC),
+                GovernanceRule(type="require_tag", tag="pci"),
+            ]
+        )
+    if name == "eu_residency":
+        return GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="deny_provider", provider=ProviderType.XAI),
+                GovernanceRule(type="require_tag", tag="eu"),
+            ]
+        )
+    if name == "cost_guarded":
+        return GovernancePolicyPack(
+            rules=[
+                GovernanceRule(type="allow_provider", provider=ProviderType.OPENAI),
+                GovernanceRule(type="allow_provider", provider=ProviderType.DEEPSEEK),
+                GovernanceRule(type="require_tag", tag="cost-sensitive"),
+            ]
+        )
+    raise RoutingPolicyError(f"unknown governance policy pack {name!r}")
+
+
+def apply_governance_pack(
+    policy: RoutingPolicy | None,
+    pack_name: str,
+) -> RoutingPolicy:
+    pack = governance_policy_pack(pack_name)
+    if policy is None:
+        return RoutingPolicy(governance=GovernancePolicyPack(rules=list(pack.rules)))
+    existing = list(policy.governance.rules) if policy.governance else []
+    return RoutingPolicy(
+        aliases=dict(policy.aliases),
+        fallback_order=list(policy.fallback_order),
+        max_total_cost_usd=policy.max_total_cost_usd,
+        max_requests_per_minute=policy.max_requests_per_minute,
+        governance=GovernancePolicyPack(rules=[*existing, *pack.rules]),
+    )
+
+
 def resolve_routing_target(
     policy: RoutingPolicy | None,
     provider: ProviderType,

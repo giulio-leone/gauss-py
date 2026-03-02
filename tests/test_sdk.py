@@ -412,6 +412,31 @@ class TestAgent:
                 governance_tags=[],
             )
 
+    def test_governance_policy_pack_helpers(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.routing_policy import (
+            RoutingPolicyError,
+            apply_governance_pack,
+            governance_policy_pack,
+            resolve_routing_target,
+        )
+
+        pack = governance_policy_pack("enterprise_strict")
+        assert any(rule.type == "require_tag" and rule.tag == "pci" for rule in pack.rules)
+
+        merged = apply_governance_pack(None, "cost_guarded")
+        provider, model = resolve_routing_target(
+            merged,
+            ProviderType.OPENAI,
+            "gpt-5.2",
+            governance_tags=["cost-sensitive"],
+        )
+        assert provider == ProviderType.OPENAI
+        assert model == "gpt-5.2"
+
+        with pytest.raises(RoutingPolicyError, match="unknown governance policy pack"):
+            governance_policy_pack("unknown-pack")
+
     def test_stream_text_aggregates_deltas(self) -> None:
         from gauss._types import AgentResult
         from gauss.agent import Agent
@@ -676,6 +701,22 @@ class TestNetwork:
         assert result == {"result": "delegated"}
         _mock_native.network_set_supervisor.assert_called_with(30, "supervisor")
         net.destroy()
+
+    def test_templates(self) -> None:
+        from gauss.errors import ValidationError
+        from gauss.network import Network
+
+        template = Network.template("research-delivery")
+        assert template["supervisor"] == "lead"
+        assert len(template["agents"]) >= 3
+
+        net = Network.from_template("incident-response")
+        result = net.delegate("incident-commander", "Stabilize production incident")
+        assert result == {"result": "delegated"}
+        net.destroy()
+
+        with pytest.raises(ValidationError, match='Unknown network template'):
+            Network.template("unknown")
 
 
 # ===========================================================================

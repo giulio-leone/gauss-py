@@ -214,6 +214,12 @@ class ControlPlane:
                         self._send_json(payload)
                         return
 
+                    if parsed.path == "/api/ops/tenants":
+                        filters = outer._apply_auth_claims(outer._parse_context_filters(params))
+                        payload = json.dumps(outer._ops_tenants(filters), indent=2).encode("utf-8")
+                        self._send_json(payload)
+                        return
+
                     if parsed.path == "/api/stream":
                         filters = outer._apply_auth_claims(outer._parse_context_filters(params))
                         channels = outer._parse_stream_channels(params)
@@ -588,6 +594,7 @@ class ControlPlane:
             "supports_replay_cursor": True,
             "supports_channel_rbac": True,
             "supports_ops_summary": True,
+            "supports_ops_tenants": True,
             "hosted_dashboard_path": "/ops",
         }
 
@@ -653,6 +660,64 @@ class ControlPlane:
             "session_count": len(sessions),
             "run_count": len(runs),
         }
+
+    def _ops_tenants(self, filters: dict[str, str | None] | None = None) -> list[dict[str, Any]]:
+        history = self._filter_history(filters)
+        grouped: dict[str, dict[str, Any]] = {}
+
+        for item in history:
+            if not isinstance(item, dict):
+                continue
+            context = item.get("context", {})
+            if not isinstance(context, dict):
+                context = {}
+            tenant_id = str(context.get("tenant_id") or "_unscoped")
+            current = grouped.get(tenant_id)
+            if current is None:
+                current = {
+                    "tenant_id": tenant_id,
+                    "snapshot_count": 0,
+                    "spans_count": 0,
+                    "pending_approvals_count": 0,
+                    "latest_total_cost_usd": 0.0,
+                    "session_ids": set(),
+                    "run_ids": set(),
+                    "latest_generated_at": str(item.get("generated_at") or ""),
+                }
+                grouped[tenant_id] = current
+
+            current["snapshot_count"] += 1
+            spans = item.get("spans")
+            pending = item.get("pending_approvals")
+            current["spans_count"] += len(spans) if isinstance(spans, list) else 0
+            current["pending_approvals_count"] += len(pending) if isinstance(pending, list) else 0
+            latest_cost = item.get("latest_cost")
+            if isinstance(latest_cost, dict):
+                current["latest_total_cost_usd"] = float(latest_cost.get("total_cost_usd", 0.0))
+            generated_at = str(item.get("generated_at") or "")
+            if generated_at >= current["latest_generated_at"]:
+                current["latest_generated_at"] = generated_at
+            if context.get("session_id"):
+                current["session_ids"].add(str(context["session_id"]))
+            if context.get("run_id"):
+                current["run_ids"].add(str(context["run_id"]))
+
+        out: list[dict[str, Any]] = []
+        for tenant_id in sorted(grouped.keys()):
+            current = grouped[tenant_id]
+            out.append(
+                {
+                    "tenant_id": current["tenant_id"],
+                    "snapshot_count": current["snapshot_count"],
+                    "spans_count": current["spans_count"],
+                    "pending_approvals_count": current["pending_approvals_count"],
+                    "latest_total_cost_usd": current["latest_total_cost_usd"],
+                    "session_count": len(current["session_ids"]),
+                    "run_count": len(current["run_ids"]),
+                    "latest_generated_at": current["latest_generated_at"],
+                }
+            )
+        return out
 
     def _render_hosted_ops_html(self) -> str:
         return """<!doctype html>

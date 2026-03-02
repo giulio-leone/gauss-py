@@ -57,13 +57,15 @@ class TestControlPlane:
 
     def test_exposes_hosted_ops_capabilities_health_and_dashboard(self):
         cp = ControlPlane(telemetry=_DummyTelemetry(), approvals=_DummyApprovals())
-        cp.snapshot()
+        cp.with_context({"tenant_id": "t-1", "session_id": "s-1", "run_id": "r-1"}).snapshot()
+        cp.with_context({"tenant_id": "t-2", "session_id": "s-2", "run_id": "r-2"}).snapshot()
         url = cp.start_server(port=0)
 
         with urllib.request.urlopen(f"{url}/api/ops/capabilities") as resp:
             caps = json.loads(resp.read().decode("utf-8"))
             assert caps["supports_multiplex"] is True
             assert caps["supports_ops_summary"] is True
+            assert caps["supports_ops_tenants"] is True
             assert caps["hosted_dashboard_path"] == "/ops"
 
         with urllib.request.urlopen(f"{url}/api/ops/health") as resp:
@@ -76,6 +78,12 @@ class TestControlPlane:
             assert summary["status"] == "ok"
             assert summary["history_size"] >= 1
             assert summary["spans_count"] >= 1
+
+        with urllib.request.urlopen(f"{url}/api/ops/tenants") as resp:
+            tenants = json.loads(resp.read().decode("utf-8"))
+            assert len(tenants) >= 2
+            assert any(item["tenant_id"] == "t-1" for item in tenants)
+            assert any(item["tenant_id"] == "t-2" for item in tenants)
 
         with urllib.request.urlopen(f"{url}/ops") as resp:
             html = resp.read().decode("utf-8")

@@ -112,6 +112,10 @@ network = Network.quick("supervisor", [
 delegated = network.delegate("math-expert", "What is 13 * 7?")
 print(delegated)
 network.destroy()
+
+# Built-in starter templates
+incident = Network.from_template("incident-response")
+incident.destroy()
 ```
 
 ---
@@ -206,6 +210,13 @@ runtime_routed = routed_agent.with_routing_context(
     current_requests_per_minute=20,
     governance_tags=["pci"],
 )
+
+# Apply built-in enterprise governance packs
+from gauss import apply_governance_pack
+hardened_policy = apply_governance_pack(
+    RoutingPolicy(fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI]),
+    "enterprise_strict",
+)
 ```
 
 ### Unified Control Plane (M51 foundation)
@@ -228,6 +239,7 @@ print(f"Control Plane: {url}")
 # hosted ops capabilities -> GET {url}/api/ops/capabilities
 # hosted ops health -> GET {url}/api/ops/health
 # hosted ops summary -> GET {url}/api/ops/summary
+# hosted ops tenant breakdown -> GET {url}/api/ops/tenants
 # hosted ops dashboard -> GET {url}/ops
 ```
 
@@ -249,7 +261,7 @@ text_async = await agent.agenerate("write a haiku")
 - **Agents**: `Agent`, `gauss()`
 - **Teams**: `Team`, `Team.quick()`
 - **Graphs**: `Graph`, `Graph.pipeline()`, `add_conditional_edge()`
-- **Workflows / Networks**: `Workflow`, `Network`, `Network.quick()`
+- **Workflows / Networks**: `Workflow`, `Network`, `Network.quick()`, `Network.from_template()`
 - **Typed tools**: `@tool`, `create_tool_executor()`, `with_tool()`
 - **MCP**: `McpServer`, `McpClient`
 - **A2A**: `A2aClient`, `text_message()`, `user_message()`, `agent_message()`, `extract_text()`, `task_text()`
@@ -259,7 +271,7 @@ text_async = await agent.agenerate("write a haiku")
 - **Pipeline helpers**: `pipe`, `map_*`, `filter_*`, `reduce_*`, `tap_async()`
 - **Observability & quality**: `Telemetry`, `EvalRunner`
 - **Control plane**: `ControlPlane` (local snapshot API + dashboard)
-- **Routing policy**: `RoutingPolicy`, `RoutingCandidate`, `resolve_routing_target()`
+- **Routing policy**: `RoutingPolicy`, `RoutingCandidate`, `resolve_routing_target()`, `apply_governance_pack()`
 - **Enterprise preset**: `enterprise_preset()`, `enterprise_run()`
 
 ---

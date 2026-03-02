@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from gauss._types import Message
-from gauss.errors import DisposedError
+from gauss.errors import DisposedError, ValidationError
 
 
 class Network:
@@ -87,6 +87,36 @@ class Network:
             )
         network.set_supervisor(supervisor)
         return network
+
+    @classmethod
+    def template(cls, name: str) -> dict[str, Any]:
+        if name == "research-delivery":
+            return {
+                "supervisor": "lead",
+                "agents": [
+                    {"name": "lead", "instructions": "Coordinate and delegate work."},
+                    {"name": "researcher", "instructions": "Research context and constraints."},
+                    {"name": "implementer", "instructions": "Implement practical solutions."},
+                ],
+            }
+        if name == "incident-response":
+            return {
+                "supervisor": "incident-commander",
+                "agents": [
+                    {
+                        "name": "incident-commander",
+                        "instructions": "Drive response and coordination.",
+                    },
+                    {"name": "triage", "instructions": "Assess impact and prioritize mitigation."},
+                    {"name": "remediator", "instructions": "Propose and execute remediation steps."},
+                ],
+            }
+        raise ValidationError(f'Unknown network template "{name}"', "name")
+
+    @classmethod
+    def from_template(cls, name: str) -> Network:
+        template = cls.template(name)
+        return cls.quick(template["supervisor"], template["agents"])
 
     def delegate(
         self,
