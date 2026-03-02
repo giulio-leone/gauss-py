@@ -29,6 +29,22 @@ async def agent_run(
     options_json: str | None = None,
 ) -> str: ...
 
+async def agent_run_with_tool_executor(
+    name: str,
+    provider_handle: int,
+    messages_json: str,
+    options_json: str | None = None,
+    tool_executor: object | None = None,
+) -> str: ...
+
+async def agent_stream(
+    name: str,
+    provider_handle: int,
+    messages_json: str,
+    stream_callback: object,
+    options_json: str | None = None,
+) -> str: ...
+
 # --- Code Execution / Generation ---
 
 async def generate(
@@ -46,6 +62,16 @@ async def stream_generate(
     messages_json: str,
     temperature: float | None = None,
     max_tokens: int | None = None,
+) -> str: ...
+
+async def generate_with_tools(
+    provider_handle: int,
+    messages_json: str,
+    tools_json: str,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+    thinking_budget: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> str: ...
 
 async def execute_code(

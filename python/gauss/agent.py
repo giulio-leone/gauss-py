@@ -177,44 +177,7 @@ class Agent:
         self._check_alive()
         messages = self._normalize_messages(prompt)
         messages_json = json.dumps(messages)
-
-        options: dict[str, Any] = {}
-        if self._tools:
-            options["tools"] = [t.to_dict() for t in self._tools]
-        if self._config.system_prompt:
-            options["instructions"] = self._config.system_prompt
-        if self._config.temperature is not None:
-            options["temperature"] = self._config.temperature
-        if self._config.max_tokens is not None:
-            options["max_tokens"] = self._config.max_tokens
-        if self._config.stop_condition:
-            options["stop_on_tool"] = self._config.stop_condition
-        if self._config.thinking_budget is not None:
-            options["thinking_budget"] = self._config.thinking_budget
-        if self._config.reasoning_effort is not None:
-            options["reasoning_effort"] = self._config.reasoning_effort
-        if self._config.cache_control:
-            options["cache_control"] = True
-        if self._config.code_execution is not None:
-            if self._config.code_execution is True:
-                options["code_execution"] = True
-            elif isinstance(self._config.code_execution, CodeExecutionOptions):
-                ce = self._config.code_execution
-                options["code_execution"] = {
-                    "python": ce.python,
-                    "javascript": ce.javascript,
-                    "bash": ce.bash,
-                    "unified": ce.unified,
-                    "timeout": ce.timeout,
-                    "sandbox": ce.sandbox,
-                }
-
-        if self._config.grounding:
-            options["grounding"] = True
-        if self._config.native_code_execution:
-            options["native_code_execution"] = True
-        if self._config.response_modalities is not None:
-            options["response_modalities"] = self._config.response_modalities
+        options = self._build_options()
 
         result_json = _run_native(
             agent_run,
@@ -224,39 +187,7 @@ class Agent:
             json.dumps(options) if options else None,
         )
 
-        data = json.loads(result_json)
-        raw_citations = data.get("citations", [])
-        citations = [
-            Citation(
-                citation_type=c.get("type", ""),
-                cited_text=c.get("cited_text"),
-                document_title=c.get("document_title"),
-                start=c.get("start"),
-                end=c.get("end"),
-            )
-            for c in raw_citations
-        ]
-        raw_grounding = data.get("grounding_metadata", [])
-        grounding_metadata = [
-            GroundingMetadata(
-                search_queries=gm.get("search_queries", []),
-                grounding_chunks=[
-                    GroundingChunk(url=gc.get("url"), title=gc.get("title"))
-                    for gc in gm.get("grounding_chunks", [])
-                ],
-                search_entry_point=gm.get("search_entry_point"),
-            )
-            for gm in (raw_grounding or [])
-        ]
-        return AgentResult(
-            text=data.get("text", ""),
-            messages=data.get("messages", []),
-            tool_calls=data.get("toolCalls", []),
-            usage=data.get("usage", {}),
-            thinking=data.get("thinking"),
-            citations=citations,
-            grounding_metadata=grounding_metadata,
-        )
+        return self._parse_result(json.loads(result_json))
 
     def generate(self, prompt: str | Sequence[Message | dict[str, str]]) -> str:
         """Generate text and return only the response string.
@@ -329,6 +260,151 @@ class Agent:
             code_execution=data.get("code_execution", False),
             web_search=data.get("web_search", False),
         )
+
+    def run_with_tools(
+        self,
+        prompt: str | Sequence[Message | dict[str, str]],
+        tool_executor: Any,
+    ) -> AgentResult:
+        """Run the agent with a custom tool executor callback.
+
+        When the model requests a tool call, the ``tool_executor`` is
+        invoked with a JSON string ``{"tool": "<name>", "args": {...}}``
+        and must return a JSON string with the tool result.  Supports
+        both sync and async callables.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+            tool_executor: A callable ``(call_json: str) -> str`` or
+                ``async (call_json: str) -> str`` that handles tool calls.
+
+        Returns:
+            :class:`AgentResult` with the final response.
+
+        Raises:
+            RuntimeError: If the agent has been destroyed.
+
+        Example:
+            >>> def handle_tool(call_json: str) -> str:
+            ...     data = json.loads(call_json)
+            ...     if data["tool"] == "get_weather":
+            ...         return json.dumps({"temp": 72, "unit": "F"})
+            ...     return json.dumps({"error": "unknown tool"})
+            >>> result = agent.run_with_tools("What's the weather?", handle_tool)
+        """
+        from gauss._native import agent_run_with_tool_executor
+
+        self._check_alive()
+        messages = self._normalize_messages(prompt)
+        messages_json = json.dumps(messages)
+        options = self._build_options()
+
+        result_json = _run_native(
+            agent_run_with_tool_executor,
+            self._config.name,
+            self._provider_handle,
+            messages_json,
+            json.dumps(options) if options else None,
+            tool_executor,
+        )
+
+        return self._parse_result(json.loads(result_json))
+
+    def stream(
+        self,
+        prompt: str | Sequence[Message | dict[str, str]],
+        callback: Any,
+    ) -> AgentResult:
+        """Stream agent execution, pushing events to a callback.
+
+        Each event is delivered as a JSON string to the ``callback``.
+        Event types include ``text_delta``, ``step_start``,
+        ``step_finish``, ``tool_result``, ``done``, and ``error``.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+            callback: A callable ``(event_json: str) -> None`` invoked
+                for each streaming event.
+
+        Returns:
+            :class:`AgentResult` with the final aggregated result.
+
+        Raises:
+            RuntimeError: If the agent has been destroyed.
+
+        Example:
+            >>> def on_event(event_json: str):
+            ...     event = json.loads(event_json)
+            ...     if event["type"] == "text_delta":
+            ...         print(event["delta"], end="", flush=True)
+            >>> result = agent.stream("Tell me a story", on_event)
+        """
+        from gauss._native import agent_stream
+
+        self._check_alive()
+        messages = self._normalize_messages(prompt)
+        messages_json = json.dumps(messages)
+        options = self._build_options()
+
+        result_json = _run_native(
+            agent_stream,
+            self._config.name,
+            self._provider_handle,
+            messages_json,
+            callback,
+            json.dumps(options) if options else None,
+        )
+
+        data = json.loads(result_json)
+        return AgentResult(
+            text=data.get("text", ""),
+            messages=[],
+            tool_calls=[],
+            usage=data.get("usage", {}),
+        )
+
+    def generate_with_tools(
+        self,
+        prompt: str | Sequence[Message | dict[str, str]],
+        tools: Sequence[ToolDef] | None = None,
+    ) -> dict[str, Any]:
+        """Single-turn generate with tool definitions (no agent loop).
+
+        Unlike :meth:`run_with_tools`, this does **not** execute tools.
+        It returns the model's response including any tool call requests,
+        allowing you to handle execution yourself.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+            tools: Tool definitions to provide to the model.  If ``None``,
+                uses the agent's registered tools.
+
+        Returns:
+            A dict with ``text``, ``tool_calls``, ``usage``, and
+            ``finish_reason`` keys.
+
+        Example:
+            >>> result = agent.generate_with_tools("Search for Python docs")
+            >>> for call in result["tool_calls"]:
+            ...     print(f"Tool: {call['name']}, Args: {call['args']}")
+        """
+        from gauss._native import generate_with_tools
+
+        self._check_alive()
+        messages = self._normalize_messages(prompt)
+        effective_tools = list(tools) if tools else self._tools
+        tools_json = json.dumps([t.to_dict() for t in effective_tools])
+
+        result_json = _run_native(
+            generate_with_tools,
+            self._provider_handle,
+            json.dumps(messages),
+            tools_json,
+            self._config.temperature,
+            self._config.max_tokens,
+        )
+
+        return json.loads(result_json)
 
     def stream_iter(self, prompt: str | Sequence[Message | dict[str, str]]) -> AgentStream:
         """Return an async-iterable stream of events for the given prompt.
@@ -448,6 +524,82 @@ class Agent:
     def _check_alive(self) -> None:
         if self._destroyed:
             raise RuntimeError("Agent has been destroyed")
+
+    def _build_options(self) -> dict[str, Any]:
+        """Build the options dict from current config (DRY helper)."""
+        options: dict[str, Any] = {}
+        if self._tools:
+            options["tools"] = [t.to_dict() for t in self._tools]
+        if self._config.system_prompt:
+            options["instructions"] = self._config.system_prompt
+        if self._config.temperature is not None:
+            options["temperature"] = self._config.temperature
+        if self._config.max_tokens is not None:
+            options["max_tokens"] = self._config.max_tokens
+        if self._config.stop_condition:
+            options["stop_on_tool"] = self._config.stop_condition
+        if self._config.thinking_budget is not None:
+            options["thinking_budget"] = self._config.thinking_budget
+        if self._config.reasoning_effort is not None:
+            options["reasoning_effort"] = self._config.reasoning_effort
+        if self._config.cache_control:
+            options["cache_control"] = True
+        if self._config.code_execution is not None:
+            if self._config.code_execution is True:
+                options["code_execution"] = True
+            elif isinstance(self._config.code_execution, CodeExecutionOptions):
+                ce = self._config.code_execution
+                options["code_execution"] = {
+                    "python": ce.python,
+                    "javascript": ce.javascript,
+                    "bash": ce.bash,
+                    "unified": ce.unified,
+                    "timeout": ce.timeout,
+                    "sandbox": ce.sandbox,
+                }
+        if self._config.grounding:
+            options["grounding"] = True
+        if self._config.native_code_execution:
+            options["native_code_execution"] = True
+        if self._config.response_modalities is not None:
+            options["response_modalities"] = self._config.response_modalities
+        return options
+
+    @staticmethod
+    def _parse_result(data: dict[str, Any]) -> AgentResult:
+        """Parse a JSON result dict into an AgentResult (DRY helper)."""
+        raw_citations = data.get("citations", [])
+        citations = [
+            Citation(
+                citation_type=c.get("type", ""),
+                cited_text=c.get("cited_text"),
+                document_title=c.get("document_title"),
+                start=c.get("start"),
+                end=c.get("end"),
+            )
+            for c in raw_citations
+        ]
+        raw_grounding = data.get("grounding_metadata", [])
+        grounding_metadata = [
+            GroundingMetadata(
+                search_queries=gm.get("search_queries", []),
+                grounding_chunks=[
+                    GroundingChunk(url=gc.get("url"), title=gc.get("title"))
+                    for gc in gm.get("grounding_chunks", [])
+                ],
+                search_entry_point=gm.get("search_entry_point"),
+            )
+            for gm in (raw_grounding or [])
+        ]
+        return AgentResult(
+            text=data.get("text", ""),
+            messages=data.get("messages", []),
+            tool_calls=data.get("toolCalls", []),
+            usage=data.get("usage", {}),
+            thinking=data.get("thinking"),
+            citations=citations,
+            grounding_metadata=grounding_metadata,
+        )
 
     @property
     def handle(self) -> int:
