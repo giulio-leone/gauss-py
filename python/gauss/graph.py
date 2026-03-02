@@ -253,4 +253,6 @@ class Graph:
 
     def _check_alive(self) -> None:
         if self._destroyed:
-            raise RuntimeError("Graph has been destroyed")
+            from gauss.errors import DisposedError
+
+            raise DisposedError("Graph", "graph")

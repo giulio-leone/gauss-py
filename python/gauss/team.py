@@ -46,6 +46,7 @@ class Team:
         from gauss._native import create_team
 
         self._handle: int = create_team(name)
+        self._name = name
         self._destroyed = False
 
     @property
@@ -144,4 +145,6 @@ class Team:
 
     def _check_alive(self) -> None:
         if self._destroyed:
-            raise RuntimeError("Team has been destroyed")
+            from gauss.errors import DisposedError
+
+            raise DisposedError("Team", getattr(self, '_name', 'team'))

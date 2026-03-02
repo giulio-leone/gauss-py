@@ -18,7 +18,7 @@ One-liner::
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from gauss._types import (
     AgentConfig,
@@ -35,6 +35,7 @@ from gauss._types import (
     resolve_api_key,
 )
 from gauss.models import OPENAI_DEFAULT
+from gauss.errors import DisposedError, ProviderError, ToolExecutionError
 from gauss.stream import AgentStream
 from gauss.tool import TypedToolDef, create_tool_executor
 
@@ -546,6 +547,51 @@ class Agent:
         self._tools.extend(tools)
         return self
 
+    def with_tool(
+        self,
+        name: str,
+        description: str,
+        parameters: dict[str, object] | None = None,
+        *,
+        execute: Callable[..., str] | None = None,
+    ) -> Agent:
+        """Define and register an inline tool in one call.
+
+        Convenience method that creates a :class:`TypedToolDef` and adds it
+        to the agent, enabling fluent chaining::
+
+            agent.with_tool(
+                "add", "Add two numbers",
+                {"a": {"type": "number"}, "b": {"type": "number"}},
+                execute=lambda a, b: str(a + b),
+            ).with_tool(
+                "greet", "Greet a person",
+                {"name": {"type": "string"}},
+                execute=lambda name: f"Hello, {name}!",
+            )
+
+        Args:
+            name: Tool name.
+            description: Human-readable tool description.
+            parameters: JSON Schema-style parameter definitions.
+            execute: Callback function invoked when the model calls this tool.
+
+        Returns:
+            ``self`` for method chaining.
+
+        .. versionadded:: 2.1.0
+        """
+        from gauss.tool import TypedToolDef as _TypedToolDef
+
+        td = _TypedToolDef(
+            name=name,
+            description=description,
+            parameters=parameters or {},
+            execute=execute,
+        )
+        self._tools.append(td)
+        return self
+
     def set_options(self, **kwargs: Any) -> Agent:
         """Update runtime configuration options.
 
@@ -755,7 +801,7 @@ class Agent:
 
     def _check_alive(self) -> None:
         if self._destroyed or self._provider_handle is None:
-            raise RuntimeError("Agent has been destroyed")
+            raise DisposedError("Agent", self._config.name or "agent")
 
     def _build_options(
         self, *, tool_defs: list[dict[str, Any]] | None = None,

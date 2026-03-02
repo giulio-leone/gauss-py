@@ -185,6 +185,12 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "Task": ("gauss.a2a", "Task"),
     "TaskState": ("gauss.a2a", "TaskState"),
     "TaskStatus": ("gauss.a2a", "TaskStatus"),
+    # errors
+    "GaussError": ("gauss.errors", "GaussError"),
+    "DisposedError": ("gauss.errors", "DisposedError"),
+    "ProviderError": ("gauss.errors", "ProviderError"),
+    "ToolExecutionError": ("gauss.errors", "ToolExecutionError"),
+    "ValidationError": ("gauss.errors", "ValidationError"),
     # tool_registry
     "ToolRegistry": ("gauss.tool_registry", "ToolRegistry"),
     "ToolRegistryEntry": ("gauss.tool_registry", "ToolRegistryEntry"),
@@ -379,4 +385,10 @@ __all__ = [
     "load_text",
     "load_markdown",
     "load_json",
+    # Errors
+    "GaussError",
+    "DisposedError",
+    "ProviderError",
+    "ToolExecutionError",
+    "ValidationError",
 ]

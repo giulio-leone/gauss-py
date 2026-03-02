@@ -180,9 +180,10 @@ class TestAgent:
 
     def test_throws_after_destroy(self) -> None:
         from gauss.agent import Agent
+        from gauss.errors import DisposedError
         agent = Agent()
         agent.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             agent.run("Test")
 
     def test_add_tool_chainable(self) -> None:
@@ -294,10 +295,11 @@ class TestGraph:
         _mock_native.destroy_graph.assert_called_once()
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.graph import Graph
         g = Graph()
         g.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             g.add_edge("a", "b")
 
 
@@ -704,9 +706,10 @@ class TestAgentStream:
     @pytest.mark.asyncio
     async def test_stream_raises_after_destroy(self) -> None:
         from gauss import Agent
+        from gauss.errors import DisposedError
         agent = Agent()
         agent.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             agent.stream_iter("Hello")
 
 
@@ -1104,10 +1107,11 @@ class TestTeam:
         _mock_native.destroy_team.assert_called_once()
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.team import Team
         t = Team("t")
         t.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             t.add(MagicMock())
 
 
