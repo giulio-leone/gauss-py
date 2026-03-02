@@ -45,8 +45,14 @@ def resolve_routing_target(
         return provider, model
     candidates = policy.aliases.get(model)
     if candidates:
-        selected = max(candidates, key=lambda c: c.priority)
-        return selected.provider, selected.model
+        if not available_providers:
+            selected = max(candidates, key=lambda c: c.priority)
+            return selected.provider, selected.model
+        available = set(available_providers)
+        viable = [candidate for candidate in candidates if candidate.provider in available]
+        if viable:
+            selected = max(viable, key=lambda c: c.priority)
+            return selected.provider, selected.model
 
     fallback = resolve_fallback_provider(policy, available_providers or [])
     if fallback is not None and fallback != provider:

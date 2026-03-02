@@ -170,6 +170,13 @@ routed_agent = Agent(
         max_requests_per_minute=60,
     ),
 )
+
+# Runtime policy-router decision (availability + budget + rate)
+runtime_routed = routed_agent.with_routing_context(
+    available_providers=[ProviderType.OPENAI],
+    estimated_cost_usd=1.2,
+    current_requests_per_minute=20,
+)
 ```
 
 ### Unified Control Plane (M51 foundation)

@@ -272,9 +272,48 @@ class TestAgent:
         agent.destroy()
         clone.destroy()
 
+    def test_with_routing_context_applies_runtime_decision(self) -> None:
+        from gauss._types import ProviderType
+        from gauss.agent import Agent
+        from gauss.routing_policy import RoutingCandidate, RoutingPolicy
+
+        agent = Agent(
+            provider=ProviderType.OPENAI,
+            model="fast-chat",
+            routing_policy=RoutingPolicy(
+                aliases={
+                    "fast-chat": [
+                        RoutingCandidate(
+                            provider=ProviderType.OPENAI,
+                            model="gpt-4o-mini",
+                            priority=1,
+                        ),
+                        RoutingCandidate(
+                            provider=ProviderType.ANTHROPIC,
+                            model="claude-3-5-haiku-latest",
+                            priority=10,
+                        ),
+                    ]
+                },
+                fallback_order=[ProviderType.OPENAI],
+            ),
+        )
+        clone = agent.with_routing_context(available_providers=[ProviderType.OPENAI])
+        assert clone is not agent
+        assert clone._model == "gpt-4o-mini"
+        assert _mock_native.create_provider.call_args[0][0] == "openai"
+        assert _mock_native.create_provider.call_args[0][1] == "gpt-4o-mini"
+        agent.destroy()
+        clone.destroy()
+
     def test_routing_policy_fallback_helpers(self) -> None:
         from gauss._types import ProviderType
-        from gauss.routing_policy import RoutingPolicy, resolve_fallback_provider, resolve_routing_target
+        from gauss.routing_policy import (
+            RoutingCandidate,
+            RoutingPolicy,
+            resolve_fallback_provider,
+            resolve_routing_target,
+        )
 
         policy = RoutingPolicy(fallback_order=[ProviderType.ANTHROPIC, ProviderType.OPENAI])
         fallback = resolve_fallback_provider(policy, [ProviderType.OPENAI])
@@ -288,6 +327,31 @@ class TestAgent:
         )
         assert provider == ProviderType.OPENAI
         assert model == "gpt-5.2"
+
+        alias_policy = RoutingPolicy(
+            aliases={
+                "fast-chat": [
+                    RoutingCandidate(
+                        provider=ProviderType.OPENAI,
+                        model="gpt-4o-mini",
+                        priority=1,
+                    ),
+                    RoutingCandidate(
+                        provider=ProviderType.ANTHROPIC,
+                        model="claude-3-5-haiku-latest",
+                        priority=10,
+                    ),
+                ]
+            }
+        )
+        provider, model = resolve_routing_target(
+            alias_policy,
+            ProviderType.OPENAI,
+            "fast-chat",
+            available_providers=[ProviderType.OPENAI],
+        )
+        assert provider == ProviderType.OPENAI
+        assert model == "gpt-4o-mini"
 
     def test_routing_policy_cost_limit_helper(self) -> None:
         from gauss.routing_policy import (

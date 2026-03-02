@@ -742,6 +742,52 @@ class Agent:
             clone.use_mcp_server(client)
         return clone
 
+    def with_routing_context(
+        self,
+        *,
+        available_providers: list[ProviderType] | None = None,
+        estimated_cost_usd: float | None = None,
+        current_requests_per_minute: int | None = None,
+    ) -> Agent:
+        """Clone this agent after applying runtime policy-router context.
+
+        Args:
+            available_providers: Providers currently healthy/available.
+            estimated_cost_usd: Estimated cost for the next request.
+            current_requests_per_minute: Current request rate for throttling checks.
+
+        Returns:
+            A new :class:`Agent` instance resolved through routing policy + runtime context.
+        """
+        from dataclasses import replace
+
+        self._check_alive()
+        requested_provider, requested_model, _ = self._config.resolve()
+        provider, model = resolve_routing_target(
+            self._config.routing_policy,
+            requested_provider,
+            requested_model,
+            available_providers=available_providers,
+            estimated_cost_usd=estimated_cost_usd,
+            current_requests_per_minute=current_requests_per_minute,
+        )
+        config = replace(
+            self._config,
+            provider=provider,
+            model=model,
+            tools=list(self._tools),
+        )
+        clone = Agent(config)
+        if self._middleware is not None:
+            clone.with_middleware(self._middleware)
+        if self._guardrails is not None:
+            clone.with_guardrails(self._guardrails)
+        if self._memory is not None:
+            clone.with_memory(self._memory, self._session_id)
+        for client in self._mcp_clients:
+            clone.use_mcp_server(client)
+        return clone
+
     # ── Integration Glue (M35) ────────────────────────────────────────
 
     def with_middleware(self, chain: MiddlewareChain) -> Agent:
