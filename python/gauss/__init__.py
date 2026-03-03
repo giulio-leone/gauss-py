@@ -223,6 +223,9 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ValidationError": ("gauss.errors", "ValidationError"),
     # base
     "StatefulResource": ("gauss.base", "StatefulResource"),
+    # protocols
+    "ToolCallback": ("gauss.protocols", "ToolCallback"),
+    "ToolExecutor": ("gauss.protocols", "ToolExecutor"),
     # tool_registry
     "ToolRegistry": ("gauss.tool_registry", "ToolRegistry"),
     "ToolRegistryEntry": ("gauss.tool_registry", "ToolRegistryEntry"),
@@ -464,4 +467,7 @@ __all__ = [
     "ValidationError",
     # Base
     "StatefulResource",
+    # Protocols
+    "ToolCallback",
+    "ToolExecutor",
 ]
