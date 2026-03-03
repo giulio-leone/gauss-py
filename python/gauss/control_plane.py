@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import os
 import time
 from collections.abc import Callable
@@ -417,7 +418,8 @@ class ControlPlane:
                     self.send_header("Content-Length", str(len(payload)))
                     self.end_headers()
                     self.wfile.write(payload)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
+                    logging.getLogger(__name__).warning("Control plane error: %s", exc)
                     payload = json.dumps({"error": str(exc)}).encode("utf-8")
                     self.send_response(500)
                     self.send_header("Content-Type", "application/json; charset=utf-8")

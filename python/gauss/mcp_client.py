@@ -19,6 +19,7 @@ Supports stdio transport (spawn subprocess) for local MCP servers.
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import threading
 from dataclasses import dataclass, field
@@ -193,7 +194,8 @@ class McpClient:
                     c.get("text", "") for c in result.content if c.get("text")
                 )
                 return json.dumps({"result": text})
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                logging.getLogger(__name__).debug("MCP tool call failed: %s", exc)
                 return json.dumps({"error": str(exc)})
 
         return tools, executor

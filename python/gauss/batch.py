@@ -12,6 +12,7 @@ Example::
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 from typing import TYPE_CHECKING, Any
 
 from gauss._types import AgentConfig, AgentResult
@@ -93,7 +94,8 @@ def batch(
     def _run(idx: int, item: BatchItem) -> None:
         try:
             item.result = agent.run(item.input)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger(__name__).debug("Batch item %d failed: %s", idx, e)
             item.error = e
 
     try:

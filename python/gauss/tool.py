@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import typing
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -84,7 +85,8 @@ def _extract_parameters(func: Callable[..., Any]) -> dict[str, Any]:
     # Try to resolve string annotations to real types
     try:
         hints = typing.get_type_hints(func)
-    except Exception:
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).debug("Could not resolve type hints for %s", func.__name__)
         hints = {}
 
     for name, param in sig.parameters.items():
@@ -231,7 +233,8 @@ def create_tool_executor(
             if isinstance(result, str):
                 return result
             return json.dumps(result)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger(__name__).debug("Tool execution error for %s: %s", tool_name, exc)
             return json.dumps({"error": str(exc)})
 
     return executor
