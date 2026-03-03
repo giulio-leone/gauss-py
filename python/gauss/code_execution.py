@@ -24,37 +24,7 @@ from gauss._types import (
     detect_provider,
     resolve_api_key,
 )
-
-
-def _run_native(func: Any, *args: Any) -> Any:
-    """Call a native function that may return a coroutine or a plain value."""
-    import asyncio
-    import inspect
-
-    async def _call() -> Any:
-        res = func(*args)
-        if inspect.isawaitable(res):
-            return await res
-        return res
-
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop is not None and loop.is_running():
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            return pool.submit(asyncio.run, _call()).result()
-
-    try:
-        result = func(*args)
-        if not inspect.isawaitable(result):
-            return result
-    except RuntimeError:
-        pass
-
-    return asyncio.run(_call())
+from gauss._utils import _run_native
 
 
 def execute_code(
