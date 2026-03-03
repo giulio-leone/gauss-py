@@ -33,6 +33,7 @@ from gauss._types import (
     ProviderType,
     ToolDef,
 )
+from gauss.base import StatefulResource
 from gauss.errors import DisposedError
 from gauss.routing_policy import RoutingPolicy, resolve_routing_target
 from gauss.stream import AgentStream
@@ -88,7 +89,7 @@ def _run_native(func: Any, *args: Any) -> Any:
     return asyncio.run(_call())
 
 
-class Agent:
+class Agent(StatefulResource):
     """Production-grade AI agent powered by Rust.
 
     Example::
@@ -136,9 +137,9 @@ class Agent:
             destroy_provider,
         )
 
+        super().__init__()
         self._config = config or AgentConfig(**kwargs)
         self._tools: list[ToolDef | TypedToolDef] = list(self._config.tools)
-        self._destroyed = False
         self._destroy_provider = destroy_provider
         self._provider_handle: int | None = None
 
@@ -950,6 +951,10 @@ class Agent:
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
+    @property
+    def _resource_name(self) -> str:
+        return "Agent"
+
     def destroy(self) -> None:
         """Release native (Rust) resources held by this agent.
 
@@ -959,18 +964,7 @@ class Agent:
         """
         if not self._destroyed and self._provider_handle is not None:
             self._destroy_provider(self._provider_handle)
-        self._destroyed = True
-
-    def __enter__(self) -> Agent:
-        """Enter the context manager, returning this agent instance."""
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        """Exit the context manager and release native resources."""
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
+        super().destroy()
 
     # ── Internal ──────────────────────────────────────────────────────
 

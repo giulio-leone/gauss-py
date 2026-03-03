@@ -779,10 +779,11 @@ class TestWorkflow:
         _mock_native.destroy_workflow.assert_called_once()
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.workflow import Workflow
         wf = Workflow()
         wf.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             wf.add_dependency("a", "b")
 
 
@@ -888,10 +889,11 @@ class TestMiddleware:
         _mock_native.destroy_middleware_chain.assert_called_once()
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.middleware import MiddlewareChain
         chain = MiddlewareChain()
         chain.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             chain.use_logging()
 
 

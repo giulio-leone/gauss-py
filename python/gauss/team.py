@@ -21,10 +21,12 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
+from gauss.base import StatefulResource
+
 TeamStrategy = Literal["sequential", "parallel"]
 
 
-class Team:
+class Team(StatefulResource):
     """Multi-agent team with sequential or parallel coordination.
 
     Args:
@@ -42,11 +44,15 @@ class Team:
     """
 
     def __init__(self, name: str) -> None:
+        super().__init__()
         from gauss._native import create_team
 
         self._handle: int = create_team(name)
         self._name = name
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "Team"
 
     @property
     def handle(self) -> int:
@@ -101,16 +107,7 @@ class Team:
             from gauss._native import destroy_team
 
             destroy_team(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> Team:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
+        super().destroy()
 
     @classmethod
     def quick(
@@ -146,4 +143,4 @@ class Team:
         if self._destroyed:
             from gauss.errors import DisposedError
 
-            raise DisposedError("Team", getattr(self, '_name', 'team'))
+            raise DisposedError("Team", getattr(self, "_name", "team"))

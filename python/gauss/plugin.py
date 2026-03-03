@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class PluginRegistry:
+
+class PluginRegistry(StatefulResource):
     """Plugin system with event emission and built-in plugins.
 
     Example::
@@ -21,10 +23,14 @@ class PluginRegistry:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_plugin_registry
 
         self._handle: int = create_plugin_registry()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "PluginRegistry"
 
     def add_telemetry(self) -> PluginRegistry:
         """Register the built-in telemetry plugin. Returns self."""
@@ -62,17 +68,4 @@ class PluginRegistry:
             from gauss._native import destroy_plugin_registry
 
             destroy_plugin_registry(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> PluginRegistry:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("PluginRegistry has been destroyed")
+        super().destroy()

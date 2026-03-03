@@ -7,12 +7,13 @@ from collections.abc import Callable
 from typing import Any
 
 from gauss._types import ToolDef
+from gauss.base import StatefulResource
 
 # Type alias for router functions used in conditional edges.
 RouterFn = Callable[[dict[str, Any]], str]
 
 
-class Graph:
+class Graph(StatefulResource):
     """Agent computation graph — DAG-based multi-agent pipeline.
 
     Example::
@@ -32,15 +33,19 @@ class Graph:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_graph
 
         self._handle: int = create_graph()
-        self._destroyed = False
 
         # SDK-level bookkeeping for conditional routing.
         self._nodes: dict[str, dict[str, Any]] = {}
         self._edges: dict[str, str] = {}
         self._conditional_edges: dict[str, RouterFn] = {}
+
+    @property
+    def _resource_name(self) -> str:
+        return "Graph"
 
     def add_node(
         self,
@@ -173,16 +178,7 @@ class Graph:
             from gauss._native import destroy_graph
 
             destroy_graph(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> Graph:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
+        super().destroy()
 
     # ── Private ─────────────────────────────────────────────────────
 

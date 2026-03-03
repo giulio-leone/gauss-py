@@ -140,15 +140,17 @@ class TestToolRegistryE2E:
             assert len(reg.list()) == 3
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
+
         reg = ToolRegistry()
         reg.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.add(ToolRegistryEntry(name="x", description="x"))
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.search("x")
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.list()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.by_tag("x")
 
 
@@ -206,9 +208,11 @@ class TestToolValidatorE2E:
             assert result["user"]["name"] == "Alice"
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
+
         v = ToolValidator()
         v.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             v.validate({}, {"type": "object"})
 
     def test_context_manager(self) -> None:

@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class ApprovalManager:
+
+class ApprovalManager(StatefulResource):
     """Manage human approval workflows for sensitive agent actions.
 
     Example::
@@ -19,10 +21,14 @@ class ApprovalManager:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_approval_manager
 
         self._handle: int = create_approval_manager()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "ApprovalManager"
 
     def request(
         self,
@@ -69,17 +75,4 @@ class ApprovalManager:
             from gauss._native import destroy_approval_manager
 
             destroy_approval_manager(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> ApprovalManager:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("ApprovalManager has been destroyed")
+        super().destroy()

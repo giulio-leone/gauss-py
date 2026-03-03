@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class CheckpointStore:
+
+class CheckpointStore(StatefulResource):
     """Save and restore agent execution state.
 
     Example::
@@ -18,10 +20,14 @@ class CheckpointStore:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_checkpoint_store
 
         self._handle: int = create_checkpoint_store()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "CheckpointStore"
 
     def save(self, checkpoint: dict[str, Any]) -> None:
         """Save a checkpoint."""
@@ -57,17 +63,4 @@ class CheckpointStore:
             from gauss._native import destroy_checkpoint_store
 
             destroy_checkpoint_store(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> CheckpointStore:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("CheckpointStore has been destroyed")
+        super().destroy()

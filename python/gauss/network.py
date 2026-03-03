@@ -6,10 +6,11 @@ import json
 from typing import Any
 
 from gauss._types import Message
+from gauss.base import StatefulResource
 from gauss.errors import DisposedError, ValidationError
 
 
-class Network:
+class Network(StatefulResource):
     """Multi-agent network with supervisor-based delegation.
 
     Example::
@@ -29,10 +30,14 @@ class Network:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_network
 
         self._handle: int = create_network()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "Network"
 
     def add_agent(
         self,
@@ -194,7 +199,7 @@ class Network:
             from gauss._native import destroy_network
 
             destroy_network(self._handle)
-            self._destroyed = True
+        super().destroy()
 
     def agent_cards(self) -> list[dict[str, Any]]:
         """Return network agent cards exposed by the native runtime."""
@@ -203,15 +208,6 @@ class Network:
         self._check_alive()
         cards_json = network_agent_cards(self._handle)
         return json.loads(cards_json)  # type: ignore[no-any-return]
-
-    def __enter__(self) -> Network:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
 
     def _check_alive(self) -> None:
         if self._destroyed:

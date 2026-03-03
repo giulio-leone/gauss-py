@@ -135,11 +135,13 @@ class TestMcpServer:
             assert "prompts" in caps
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
+
         server = McpServer("dead", "1.0.0")
         server.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             server.add_resource(McpResource(uri="x", name="x"))
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             server.add_prompt(McpPrompt(name="x", arguments=[]))
 
     def test_full_builder(self) -> None:

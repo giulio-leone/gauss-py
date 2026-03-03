@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class ToolValidator:
+
+class ToolValidator(StatefulResource):
     """Validate tool inputs against JSON schemas with auto-coercion.
 
     Example::
@@ -19,10 +21,14 @@ class ToolValidator:
     """
 
     def __init__(self, strategies: list[str] | None = None) -> None:
+        super().__init__()
         from gauss._native import create_tool_validator
 
         self._handle: int = create_tool_validator(strategies)
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "ToolValidator"
 
     def validate(self, input_data: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
         """Validate input against schema. Returns validation result."""
@@ -39,17 +45,4 @@ class ToolValidator:
             from gauss._native import destroy_tool_validator
 
             destroy_tool_validator(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> ToolValidator:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("ToolValidator has been destroyed")
+        super().destroy()

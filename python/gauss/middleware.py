@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from gauss.base import StatefulResource
 
 
-class MiddlewareChain:
+class MiddlewareChain(StatefulResource):
     """Chainable middleware pipeline for LLM requests.
 
     Example::
@@ -20,10 +20,14 @@ class MiddlewareChain:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_middleware_chain
 
         self._handle: int = create_middleware_chain()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "MiddlewareChain"
 
     def use_logging(self) -> MiddlewareChain:
         """Add logging middleware. Returns self for chaining."""
@@ -69,17 +73,4 @@ class MiddlewareChain:
             from gauss._native import destroy_middleware_chain
 
             destroy_middleware_chain(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> MiddlewareChain:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("MiddlewareChain has been destroyed")
+        super().destroy()

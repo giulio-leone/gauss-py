@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from gauss.base import StatefulResource
+
 
 @dataclass(frozen=True)
 class ToolExample:
@@ -77,7 +79,7 @@ class ToolSearchResult:
         )
 
 
-class ToolRegistry:
+class ToolRegistry(StatefulResource):
     """Searchable tool registry with tags, examples, and batch support.
 
     Example::
@@ -88,10 +90,14 @@ class ToolRegistry:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_tool_registry
 
         self._handle: int = create_tool_registry()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "ToolRegistry"
 
     def add(self, entry: ToolRegistryEntry | dict[str, Any]) -> ToolRegistry:
         """Register a tool. Returns self for chaining."""
@@ -131,17 +137,4 @@ class ToolRegistry:
             from gauss._native import destroy_tool_registry
 
             destroy_tool_registry(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> ToolRegistry:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("ToolRegistry has been destroyed")
+        super().destroy()

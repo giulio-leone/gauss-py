@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class EvalRunner:
+
+class EvalRunner(StatefulResource):
     """Run evaluations with configurable scorers and datasets.
 
     Example::
@@ -16,10 +18,14 @@ class EvalRunner:
     """
 
     def __init__(self, threshold: float = 0.8) -> None:
+        super().__init__()
         from gauss._native import create_eval_runner
 
         self._handle: int = create_eval_runner(threshold)
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "EvalRunner"
 
     def add_scorer(self, scorer_type: str) -> EvalRunner:
         """Add a scorer to the evaluation. Returns self for chaining."""
@@ -54,17 +60,4 @@ class EvalRunner:
             from gauss._native import destroy_eval_runner
 
             destroy_eval_runner(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> EvalRunner:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("EvalRunner has been destroyed")
+        super().destroy()

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from gauss._types import ToolDef
+from gauss.base import StatefulResource
 
 # ── MCP Types ────────────────────────────────────────────────────
 
@@ -243,7 +244,7 @@ class McpSamplingResponse:
 # ── McpServer Class ──────────────────────────────────────────────
 
 
-class McpServer:
+class McpServer(StatefulResource):
     """MCP-compliant server with tools, resources, and prompts.
 
     Example::
@@ -256,10 +257,14 @@ class McpServer:
     """
 
     def __init__(self, name: str, version: str = "1.0.0") -> None:
+        super().__init__()
         from gauss._native import create_mcp_server
 
         self._handle: int = create_mcp_server(name, version)
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "McpServer"
 
     def add_tool(self, tool: ToolDef | dict[str, Any]) -> McpServer:
         """Register a tool. Returns self for chaining."""
@@ -305,17 +310,4 @@ class McpServer:
             from gauss._native import destroy_mcp_server
 
             destroy_mcp_server(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> McpServer:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("McpServer has been destroyed")
+        super().destroy()

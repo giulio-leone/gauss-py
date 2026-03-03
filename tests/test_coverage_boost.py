@@ -101,10 +101,11 @@ class TestCheckpointStoreContextManager:
 
     def test_check_alive_after_destroy(self) -> None:
         from gauss.checkpoint import CheckpointStore
+        from gauss.errors import DisposedError
 
         cs = CheckpointStore()
         cs.destroy()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(DisposedError):
             cs.save({"id": "test"})
 
 
@@ -117,11 +118,12 @@ class TestToolValidatorContextManager:
             assert result is not None
 
     def test_check_alive_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.tool_validator import ToolValidator
 
         tv = ToolValidator([])
         tv.destroy()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(DisposedError):
             tv.validate({"name": "test"}, {"type": "object"})
 
 
@@ -170,11 +172,12 @@ class TestMemoryEdgeCases:
         m.destroy()
 
     def test_check_alive_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
         from gauss.memory import Memory
 
         m = Memory()
         m.destroy()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(DisposedError):
             m.recall("test")
 
 

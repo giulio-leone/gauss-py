@@ -95,13 +95,15 @@ class TestToolRegistry:
             assert len(reg.search("nonexistent")) == 0
 
     def test_throws_after_destroy(self) -> None:
+        from gauss.errors import DisposedError
+
         reg = ToolRegistry()
         reg.destroy()
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.add(ToolRegistryEntry(name="x", description="x"))
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.search("x")
-        with pytest.raises(RuntimeError, match="destroyed"):
+        with pytest.raises(DisposedError, match="destroyed"):
             reg.list()
 
 

@@ -7,10 +7,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from gauss.base import StatefulResource
+
 MemoryEntryType = Literal["conversation", "fact", "preference", "task", "summary"]
 
 
-class Memory:
+class Memory(StatefulResource):
     """Conversation memory with session-based storage.
 
     Example::
@@ -29,10 +31,14 @@ class Memory:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_memory
 
         self._handle: int = create_memory()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "Memory"
 
     def store(
         self,
@@ -120,17 +126,4 @@ class Memory:
             from gauss._native import destroy_memory
 
             destroy_memory(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> Memory:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("Memory has been destroyed")
+        super().destroy()

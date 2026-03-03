@@ -6,9 +6,10 @@ import json
 from typing import Any
 
 from gauss._types import ToolDef
+from gauss.base import StatefulResource
 
 
-class Workflow:
+class Workflow(StatefulResource):
     """Execute agents as sequential/parallel workflow steps.
 
     Example::
@@ -28,10 +29,14 @@ class Workflow:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_workflow
 
         self._handle: int = create_workflow()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "Workflow"
 
     def add_step(
         self,
@@ -106,17 +111,4 @@ class Workflow:
             from gauss._native import destroy_workflow
 
             destroy_workflow(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> Workflow:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("Workflow has been destroyed")
+        super().destroy()

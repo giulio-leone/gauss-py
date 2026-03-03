@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from gauss._types import SearchResult
+from gauss.base import StatefulResource
 
 
 @dataclass
@@ -22,7 +23,7 @@ class Chunk:
     metadata: dict[str, Any] | None = None
 
 
-class VectorStore:
+class VectorStore(StatefulResource):
     """In-memory vector store powered by Rust.
 
     Example::
@@ -35,10 +36,14 @@ class VectorStore:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_vector_store
 
         self._handle: int = create_vector_store()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "VectorStore"
 
     def upsert(self, chunks: list[Chunk | dict[str, Any]]) -> None:
         """Upsert document chunks into the store."""
@@ -114,17 +119,4 @@ class VectorStore:
             from gauss._native import destroy_vector_store
 
             destroy_vector_store(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> VectorStore:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("VectorStore has been destroyed")
+        super().destroy()

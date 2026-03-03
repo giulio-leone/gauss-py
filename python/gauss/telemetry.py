@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class Telemetry:
+
+class Telemetry(StatefulResource):
     """Collect and export spans and metrics.
 
     Example::
@@ -19,10 +21,14 @@ class Telemetry:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_telemetry
 
         self._handle: int = create_telemetry()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "Telemetry"
 
     def record_span(self, span: dict[str, Any]) -> None:
         """Record a telemetry span."""
@@ -59,17 +65,4 @@ class Telemetry:
             from gauss._native import destroy_telemetry
 
             destroy_telemetry(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> Telemetry:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("Telemetry has been destroyed")
+        super().destroy()

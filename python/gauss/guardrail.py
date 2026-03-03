@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from gauss.base import StatefulResource
 
-class GuardrailChain:
+
+class GuardrailChain(StatefulResource):
     """Chainable content safety guardrails.
 
     Example::
@@ -23,10 +25,14 @@ class GuardrailChain:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         from gauss._native import create_guardrail_chain
 
         self._handle: int = create_guardrail_chain()
-        self._destroyed = False
+
+    @property
+    def _resource_name(self) -> str:
+        return "GuardrailChain"
 
     def add_content_moderation(
         self,
@@ -93,17 +99,4 @@ class GuardrailChain:
             from gauss._native import destroy_guardrail_chain
 
             destroy_guardrail_chain(self._handle)
-            self._destroyed = True
-
-    def __enter__(self) -> GuardrailChain:
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
-        self.destroy()
-
-    def _check_alive(self) -> None:
-        if self._destroyed:
-            raise RuntimeError("GuardrailChain has been destroyed")
+        super().destroy()
