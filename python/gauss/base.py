@@ -37,8 +37,11 @@ class StatefulResource(ABC):
         self._destroyed = True
 
     def __del__(self) -> None:
-        if not self._destroyed:
-            self.destroy()
+        try:
+            if not self._destroyed:
+                self.destroy()
+        except Exception:  # noqa: BLE001
+            pass
 
     def __enter__(self) -> Any:
         return self
