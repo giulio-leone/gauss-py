@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from gauss._types import ToolDef
+from gauss.errors import DisposedError
 
 __all__ = ["McpClientConfig", "McpToolResult", "McpClient"]
 
@@ -106,7 +107,7 @@ class McpClient:
         if self._connected:
             return
         if self._closed:
-            raise RuntimeError("McpClient has been closed")
+            raise DisposedError("McpClient", "mcpClient")
 
         env = {**os.environ, **(self._config.env or {})}
         self._process = subprocess.Popen(  # noqa: S603 — command from trusted config
