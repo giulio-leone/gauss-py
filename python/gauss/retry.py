@@ -58,7 +58,7 @@ def _compute_delay(config: RetryConfig, attempt: int) -> float:
         delay = config.base_delay_s * (2 ** (attempt - 1))
 
     jitter_range = delay * config.jitter
-    delay += random.uniform(-jitter_range, jitter_range)
+    delay += random.uniform(-jitter_range, jitter_range)  # noqa: S311 — jitter, not crypto
     return min(max(0.0, delay), config.max_delay_s)
 
 

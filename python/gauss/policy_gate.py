@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         rollout = evaluate_policy_rollout_guardrails(diff, guardrails_raw)
         rollout_failed = not bool(rollout.get("ok"))
         output = {"summary": summary, "diff": diff, "rollout": rollout}
-    print(json.dumps(output, indent=2))
+    print(json.dumps(output, indent=2))  # noqa: T201 — CLI output
     return 1 if summary["failed"] > 0 or rollout_failed else 0
 
 

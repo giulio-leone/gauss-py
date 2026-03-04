@@ -109,7 +109,7 @@ class McpClient:
             raise RuntimeError("McpClient has been closed")
 
         env = {**os.environ, **(self._config.env or {})}
-        self._process = subprocess.Popen(
+        self._process = subprocess.Popen(  # noqa: S603 — command from trusted config
             [self._config.command, *self._config.args],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -289,7 +289,8 @@ class McpClient:
 
     def _read_stdout(self) -> None:
         """Background thread reading JSON-RPC responses from stdout."""
-        assert self._process and self._process.stdout
+        if not self._process or not self._process.stdout:
+            return
         buffer = ""
         while True:
             try:
