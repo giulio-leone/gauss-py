@@ -39,6 +39,10 @@ from typing import Any, get_type_hints
 
 def _python_type_to_json(python_type: Any) -> str:
     """Convert a Python type annotation to a JSON Schema type string."""
+    import typing
+    origin = typing.get_origin(python_type)
+    if origin is not None:
+        python_type = origin
     mapping: dict[type, str] = {
         str: "string",
         int: "integer",
@@ -62,6 +66,10 @@ def _build_parameter_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     required: list[str] = []
 
     for param_name, param in sig.parameters.items():
+        if param_name in ("self", "cls"):
+            continue
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+            continue
         param_type = hints.get(param_name, str)
         json_type = _python_type_to_json(param_type)
         properties[param_name] = {"type": json_type}
