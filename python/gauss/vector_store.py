@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,7 +42,7 @@ class VectorStore(StatefulResource):
 
         self._handle: int = create_vector_store()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "VectorStore"
 

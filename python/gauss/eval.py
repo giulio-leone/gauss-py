@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -23,7 +24,7 @@ class EvalRunner(StatefulResource):
 
         self._handle: int = create_eval_runner(threshold)
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "EvalRunner"
 

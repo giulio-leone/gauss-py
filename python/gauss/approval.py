@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -26,7 +27,7 @@ class ApprovalManager(StatefulResource):
 
         self._handle: int = create_approval_manager()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "ApprovalManager"
 

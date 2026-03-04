@@ -18,6 +18,7 @@ Example::
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any, Literal
 
@@ -50,7 +51,7 @@ class Team(StatefulResource):
         self._handle: int = create_team(name)
         self._name = name
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Team"
 

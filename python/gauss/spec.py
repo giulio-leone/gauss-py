@@ -19,6 +19,7 @@ Example::
 
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -164,12 +165,12 @@ class SkillSpec:
             outputs=outputs,
         )
 
-    @property
+    @functools.cached_property
     def step_count(self) -> int:
         """Get the total number of steps."""
         return len(self.steps)
 
-    @property
+    @functools.cached_property
     def required_inputs(self) -> tuple[SkillParam, ...]:
         """Get all required inputs."""
         return tuple(p for p in self.inputs if p.required)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import uuid
 from datetime import datetime, timezone
@@ -36,7 +37,7 @@ class Memory(StatefulResource):
 
         self._handle: int = create_memory()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Memory"
 

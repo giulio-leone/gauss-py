@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from collections.abc import Callable
 from typing import Any
@@ -43,7 +44,7 @@ class Graph(StatefulResource):
         self._edges: dict[str, str] = {}
         self._conditional_edges: dict[str, RouterFn] = {}
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Graph"
 

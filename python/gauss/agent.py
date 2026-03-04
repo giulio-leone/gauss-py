@@ -18,6 +18,7 @@ One-liner::
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import threading
 from collections.abc import Callable
@@ -1036,7 +1037,7 @@ class Agent(StatefulResource):
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Agent"
 

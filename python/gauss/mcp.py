@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -262,7 +263,7 @@ class McpServer(StatefulResource):
 
         self._handle: int = create_mcp_server(name, version)
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "McpServer"
 

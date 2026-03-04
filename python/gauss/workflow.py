@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -34,7 +35,7 @@ class Workflow(StatefulResource):
 
         self._handle: int = create_workflow()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Workflow"
 

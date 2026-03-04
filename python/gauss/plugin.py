@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -28,7 +29,7 @@ class PluginRegistry(StatefulResource):
 
         self._handle: int = create_plugin_registry()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "PluginRegistry"
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -30,7 +31,7 @@ class GuardrailChain(StatefulResource):
 
         self._handle: int = create_guardrail_chain()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "GuardrailChain"
 

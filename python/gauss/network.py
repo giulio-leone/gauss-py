@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -35,7 +36,7 @@ class Network(StatefulResource):
 
         self._handle: int = create_network()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Network"
 

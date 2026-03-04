@@ -282,11 +282,11 @@ def enforce_routing_governance(
         return
 
     rules = policy.governance.rules
-    allow_providers = [
+    allow_providers = {
         rule.provider
         for rule in rules
         if rule.type == "allow_provider" and rule.provider is not None
-    ]
+    }
     if allow_providers and provider not in allow_providers:
         raise RoutingPolicyError(f"routing policy governance rejected provider {provider.value}")
 

@@ -1425,7 +1425,7 @@ class ControlPlane:
         )
 
     def _assert_channel_allowed(self, channel: str) -> None:
-        roles = [str(role).lower() for role in (self._auth_claims.get("roles") or [])]
+        roles = {str(role).lower() for role in (self._auth_claims.get("roles") or [])}
         if not roles:
             return
         if "admin" in roles or "operator" in roles:

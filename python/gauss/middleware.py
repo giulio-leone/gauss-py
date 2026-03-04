@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 from gauss.base import StatefulResource
 
 
@@ -25,7 +27,7 @@ class MiddlewareChain(StatefulResource):
 
         self._handle: int = create_middleware_chain()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "MiddlewareChain"
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -25,7 +26,7 @@ class CheckpointStore(StatefulResource):
 
         self._handle: int = create_checkpoint_store()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "CheckpointStore"
 

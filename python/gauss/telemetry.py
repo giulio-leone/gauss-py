@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
 
@@ -26,7 +27,7 @@ class Telemetry(StatefulResource):
 
         self._handle: int = create_telemetry()
 
-    @property
+    @functools.cached_property
     def _resource_name(self) -> str:
         return "Telemetry"
 
