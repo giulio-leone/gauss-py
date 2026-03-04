@@ -244,6 +244,9 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "set_pricing": ("gauss.tokens", "set_pricing"),
     "get_pricing": ("gauss.tokens", "get_pricing"),
     "clear_pricing": ("gauss.tokens", "clear_pricing"),
+    # decorators (M90) — `tool` already exported from gauss.tool
+    "agent": ("gauss.decorators", "agent"),
+    "guardrail": ("gauss.decorators", "guardrail"),
 }
 
 
@@ -470,4 +473,7 @@ __all__ = [
     # Protocols
     "ToolCallback",
     "ToolExecutor",
+    # Decorators (M90)
+    "agent",
+    "guardrail",
 ]
