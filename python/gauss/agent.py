@@ -102,6 +102,7 @@ class Agent(StatefulResource):
         super().__init__()
         self._config = config or AgentConfig(**kwargs)
         self._tools: list[ToolDef | TypedToolDef] = list(self._config.tools)
+        self._tools_json_cache: str | None = None
         self._destroy_provider = destroy_provider
         self._provider_handle: int | None = None
 
@@ -590,8 +591,12 @@ class Agent(StatefulResource):
 
         self._check_alive()
         messages = self._normalize_messages(prompt)
-        effective_tools = list(tools) if tools else self._tools
-        tools_json = json.dumps([t.to_dict() for t in effective_tools])
+        if tools:
+            tools_json = json.dumps([t.to_dict() for t in tools])
+        else:
+            if self._tools_json_cache is None:
+                self._tools_json_cache = json.dumps([t.to_dict() for t in self._tools])
+            tools_json = self._tools_json_cache
 
         result_json = _run_native(
             generate_with_tools,
@@ -654,6 +659,7 @@ class Agent(StatefulResource):
             >>> agent.add_tool(ToolDef(name="get_weather", description="..."))
         """
         self._tools.append(tool)
+        self._tools_json_cache = None
         return self
 
     def add_tools(self, tools: Sequence[ToolDef | TypedToolDef]) -> Agent:
@@ -669,6 +675,7 @@ class Agent(StatefulResource):
             >>> agent.add_tools([weather_tool, search_tool])
         """
         self._tools.extend(tools)
+        self._tools_json_cache = None
         return self
 
     def with_tool(
@@ -714,6 +721,7 @@ class Agent(StatefulResource):
             execute=execute,
         )
         self._tools.append(td)
+        self._tools_json_cache = None
         return self
 
     def set_options(self, **kwargs: Any) -> Agent:
@@ -1176,6 +1184,7 @@ class Agent(StatefulResource):
                 )
                 self._tools.append(mcp_tool)
 
+        self._tools_json_cache = None
         self._mcp_tools_loaded = True
 
     @staticmethod

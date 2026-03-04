@@ -7,8 +7,9 @@ import json
 import logging
 import os
 import time
+from collections import deque
 from collections.abc import Callable
-from copy import deepcopy
+from copy import copy, deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import TYPE_CHECKING, Any
@@ -76,16 +77,16 @@ class ControlPlane:
         self._context: dict[str, str] = dict(context or {})
 
         self._latest_cost: Any = None
-        self._history: list[dict[str, Any]] = []
+        self._history: deque[dict[str, Any]] = deque(maxlen=self._history_limit)
         self._next_stream_event_id = 1
-        self._stream_events: list[dict[str, Any]] = []
+        self._stream_events: deque[dict[str, Any]] = deque(maxlen=self._stream_replay_limit)
         self._next_explain_trace_id = 1
-        self._explain_traces: list[dict[str, Any]] = []
+        self._explain_traces: deque[dict[str, Any]] = deque(maxlen=self._history_limit)
         self._latest_explain_trace_id: str | None = None
         self._policy_drift_alert_hooks: list[Callable[[dict[str, Any]], None]] = []
         self._policy_drift_sinks: list[str] = []
         self._policy_drift_schedule_config: dict[str, Any] | None = None
-        self._policy_drift_runs: list[dict[str, Any]] = []
+        self._policy_drift_runs: deque[dict[str, Any]] = deque(maxlen=self._history_limit)
         self._next_policy_drift_run_id = 1
         self._next_policy_lifecycle_version = 1
         self._policy_lifecycle_versions: list[dict[str, Any]] = []
@@ -479,8 +480,6 @@ class ControlPlane:
             "latest_explain_trace_id": self._latest_explain_trace_id,
         }
         self._history.append(item)
-        if len(self._history) > self._history_limit:
-            self._history.pop(0)
 
         if self._persist_path:
             os.makedirs(os.path.dirname(self._persist_path) or ".", exist_ok=True)
@@ -895,7 +894,7 @@ class ControlPlane:
             "version_id": f"policy-v{self._next_policy_lifecycle_version}",
             "status": "draft",
             "created_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
-            "policy": deepcopy(self._parse_policy_lifecycle_policy(params)),
+            "policy": self._parse_policy_lifecycle_policy(params),
             "validation": None,
             "audit": {
                 "drafted_by_role": role,
@@ -997,6 +996,7 @@ class ControlPlane:
             promotion_comment=comment,
         )
         self._active_policy_version_id = version_id
+        # deepcopy: version["policy"] is shared with _policy_lifecycle_versions
         self._routing_policy = deepcopy(version["policy"])
         return {
             "ok": True,
@@ -1196,8 +1196,6 @@ class ControlPlane:
         }
         self._next_policy_drift_run_id += 1
         self._policy_drift_runs.append(run)
-        if len(self._policy_drift_runs) > self._history_limit:
-            self._policy_drift_runs.pop(0)
         if self._policy_drift_schedule_config is not None:
             now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
             self._policy_drift_schedule_config["last_run_at"] = run["generated_at"]
@@ -1213,14 +1211,14 @@ class ControlPlane:
         candidate_version_id = params.get("candidateVersion", [None])[0]
 
         baseline_from_version = (
-            deepcopy(self._find_policy_lifecycle_version(baseline_version_id)["policy"])
+            copy(self._find_policy_lifecycle_version(baseline_version_id)["policy"])
             if baseline_version_id
-            else deepcopy(self._find_policy_lifecycle_version(self._active_policy_version_id)["policy"])
+            else copy(self._find_policy_lifecycle_version(self._active_policy_version_id)["policy"])
             if self._active_policy_version_id
             else None
         )
         candidate_from_version = (
-            deepcopy(self._find_policy_lifecycle_version(candidate_version_id)["policy"])
+            copy(self._find_policy_lifecycle_version(candidate_version_id)["policy"])
             if candidate_version_id
             else None
         )
@@ -1264,8 +1262,6 @@ class ControlPlane:
         self._next_explain_trace_id += 1
         self._latest_explain_trace_id = str(trace["trace_id"])
         self._explain_traces.append(trace)
-        if len(self._explain_traces) > self._history_limit:
-            self._explain_traces.pop(0)
         return trace
 
     def _ops_policy_explain_traces(self, params: dict[str, list[str]]) -> dict[str, Any]:
@@ -1331,8 +1327,6 @@ class ControlPlane:
         }
         self._next_stream_event_id += 1
         self._stream_events.append(event)
-        if len(self._stream_events) > self._stream_replay_limit:
-            self._stream_events.pop(0)
         return event
 
     def _emit_stream_batch(
