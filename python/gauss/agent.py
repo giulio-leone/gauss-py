@@ -113,6 +113,10 @@ class Agent(StatefulResource):
         self._mcp_clients: list[McpClient] = []
         self._mcp_tools_loaded = False
 
+        # Cost & tracing (M90)
+        self._last_cost: dict[str, Any] | None = None
+        self._last_trace: dict[str, Any] | None = None
+
         provider_type, model, api_key = self._config.resolve()
         provider_type, model = resolve_routing_target(
             self._config.routing_policy,
@@ -285,6 +289,19 @@ class Agent(StatefulResource):
 
         result = self._parse_result(json.loads(result_json))
 
+        # Populate cost & trace from usage (M90)
+        usage = result.usage or {}
+        if usage:
+            self._last_cost = {
+                "input_tokens": usage.get("input_tokens", 0),
+                "output_tokens": usage.get("output_tokens", 0),
+                "total_usd": usage.get("total_usd"),
+            }
+            self._last_trace = {
+                "model": self._model,
+                "usage": usage,
+            }
+
         # Memory store: save conversation
         if self._memory is not None:
             user_text = prompt if isinstance(prompt, str) else " ".join(
@@ -375,6 +392,28 @@ class Agent(StatefulResource):
             code_execution=data.get("code_execution", False),
             web_search=data.get("web_search", False),
         )
+
+    @property
+    def last_run_cost(self) -> dict[str, Any] | None:
+        """Cost estimate from the last run.
+
+        Returns a dict with keys like ``input_tokens``, ``output_tokens``,
+        and ``total_usd``, or ``None`` if no run has been executed yet.
+
+        .. versionadded:: 2.5.0
+        """
+        return self._last_cost
+
+    @property
+    def last_run_trace(self) -> dict[str, Any] | None:
+        """Trace / span data from the last run.
+
+        Returns a dict with trace metadata (spans, timings, step info),
+        or ``None`` if no run has been executed yet.
+
+        .. versionadded:: 2.5.0
+        """
+        return self._last_trace
 
     def run_with_tools(
         self,
