@@ -97,7 +97,7 @@ class AgentSpec:
             for t in (data.get("tools") or [])
         )
         env_list = data.get("environment") or []
-        environment = {k: v for k, v in env_list} if env_list else {}
+        environment = dict(env_list) if env_list else {}
 
         return cls(
             name=data.get("name", ""),

@@ -142,13 +142,14 @@ class McpClient:
             return self._cached_tools
 
         result = self._request("tools/list", {})
-        tools: list[ToolDef] = []
-        for t in (result or {}).get("tools", []):
-            tools.append(ToolDef(
+        tools: list[ToolDef] = [
+            ToolDef(
                 name=t["name"],
                 description=t.get("description", ""),
                 parameters=t.get("inputSchema"),
-            ))
+            )
+            for t in (result or {}).get("tools", [])
+        ]
 
         self._cached_tools = tools
         return tools
@@ -194,7 +195,7 @@ class McpClient:
                     c.get("text", "") for c in result.content if c.get("text")
                 )
                 return json.dumps({"result": text})
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logging.getLogger(__name__).debug("MCP tool call failed: %s", exc)
                 return json.dumps({"error": str(exc)})
 

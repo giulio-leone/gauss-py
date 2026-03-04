@@ -95,7 +95,7 @@ def batch(
     def _run(idx: int, item: BatchItem) -> None:
         try:
             item.result = agent.run(item.input)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logging.getLogger(__name__).debug("Batch item %d failed: %s", idx, e)
             item.error = e
 

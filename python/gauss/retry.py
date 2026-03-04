@@ -90,7 +90,7 @@ def with_retry(
     for attempt in range(cfg.max_retries + 1):
         try:
             return fn()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logging.getLogger(__name__).debug("Retry attempt %d failed: %s", attempt + 1, e)
             last_error = e
 

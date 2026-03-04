@@ -61,7 +61,7 @@ def _build_parameter_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     """Build a JSON Schema ``object`` from *fn*'s signature and type hints."""
     try:
         hints = get_type_hints(fn)
-    except Exception:  # noqa: BLE001
+    except Exception:
         hints = {}
 
     sig = inspect.signature(fn)

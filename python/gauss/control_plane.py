@@ -351,8 +351,7 @@ class ControlPlane:
                         follow = params.get("follow", ["0"])[0] in {"1", "true", "yes"}
                         last_event_id = outer._parse_last_event_id(self.headers, params)
                         interval_ms = int(params.get("interval_ms", ["1000"])[0] or "1000")
-                        if interval_ms < 100:
-                            interval_ms = 100
+                        interval_ms = max(interval_ms, 100)
 
                         self.send_response(200)
                         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -420,7 +419,7 @@ class ControlPlane:
                     self.send_header("Content-Length", str(len(payload)))
                     self.end_headers()
                     self.wfile.write(payload)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logging.getLogger(__name__).warning("Control plane error: %s", exc)
                     payload = json.dumps({"error": str(exc)}).encode("utf-8")
                     self.send_response(500)
@@ -496,8 +495,7 @@ class ControlPlane:
         query_token = params.get("token", [None])[0]
         return (
             auth == f"Bearer {self._auth_token}"
-            or x_token == self._auth_token
-            or query_token == self._auth_token
+            or self._auth_token in (x_token, query_token)
         )
 
     def _parse_context_filters(self, params: dict[str, list[str]]) -> dict[str, str | None]:
@@ -1614,8 +1612,7 @@ class ControlPlane:
             if isinstance(latest_cost, dict):
                 current["latest_total_cost_usd"] = float(latest_cost.get("total_cost_usd", 0.0))
             generated_at = str(item.get("generated_at") or "")
-            if generated_at >= current["latest_generated_at"]:
-                current["latest_generated_at"] = generated_at
+            current["latest_generated_at"] = max(generated_at, current["latest_generated_at"])
             if context.get("session_id"):
                 current["session_ids"].add(str(context["session_id"]))
             if context.get("run_id"):

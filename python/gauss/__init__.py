@@ -58,7 +58,7 @@ from gauss.models import (
 
 # ── Lazy-loading registry: module_path → attr_name ────────────────────────
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
-    # _types (non-core)
+    # ── _types (non-core) ───
     "CodeExecutionOptions": ("gauss._types", "CodeExecutionOptions"),
     "CodeExecutionResult": ("gauss._types", "CodeExecutionResult"),
     "GeneratedImageData": ("gauss._types", "GeneratedImageData"),
@@ -181,11 +181,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolValidator": ("gauss.tool_validator", "ToolValidator"),
     # vector_store
     "VectorStore": ("gauss.vector_store", "VectorStore"),
-    # text_splitter (M40)
+    # ── text_splitter ───
     "TextSplitter": ("gauss.text_splitter", "TextSplitter"),
     "TextChunk": ("gauss.text_splitter", "TextChunk"),
     "split_text": ("gauss.text_splitter", "split_text"),
-    # document_loader (M40)
+    # ── document_loader ───
     "LoadedDocument": ("gauss.document_loader", "LoadedDocument"),
     "load_text": ("gauss.document_loader", "load_text"),
     "load_markdown": ("gauss.document_loader", "load_markdown"),
@@ -239,7 +239,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "McpClient": ("gauss.mcp_client", "McpClient"),
     "McpClientConfig": ("gauss.mcp_client", "McpClientConfig"),
     "McpToolResult": ("gauss.mcp_client", "McpToolResult"),
-    # pricing (M42)
+    # ── pricing ───
     "ModelPricing": ("gauss.tokens", "ModelPricing"),
     "set_pricing": ("gauss.tokens", "set_pricing"),
     "get_pricing": ("gauss.tokens", "get_pricing"),
@@ -473,7 +473,7 @@ __all__ = [
     # Protocols
     "ToolCallback",
     "ToolExecutor",
-    # Decorators (M90)
+    # ── decorators ───
     "agent",
     "guardrail",
 ]

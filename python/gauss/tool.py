@@ -86,7 +86,7 @@ def _extract_parameters(func: Callable[..., Any]) -> dict[str, Any]:
     # Try to resolve string annotations to real types
     try:
         hints = typing.get_type_hints(func)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logging.getLogger(__name__).debug("Could not resolve type hints for %s", func.__name__)
         hints = {}
 
@@ -234,7 +234,7 @@ def create_tool_executor(
             if isinstance(result, str):
                 return result
             return json.dumps(result)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logging.getLogger(__name__).debug("Tool execution error for %s: %s", tool_name, exc)
             return json.dumps({"error": str(exc)})
 

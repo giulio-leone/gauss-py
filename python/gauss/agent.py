@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from gauss.middleware import MiddlewareChain
 
 
-from gauss._utils import _run_native  # noqa: F401 — re-exported for backward compat
+from gauss._utils import _run_native  # re-exported for backward compat
 
 __all__ = ["Agent", "gauss", "enterprise_preset", "enterprise_run"]
 
@@ -119,7 +119,7 @@ class Agent(StatefulResource):
         self._mcp_clients: list[McpClient] = []
         self._mcp_tools_loaded = False
 
-        # Cost & tracing (M90)
+        # ── cost and tracing state ───
         self._state_lock = threading.Lock()
         self._last_cost: dict[str, Any] | None = None
         self._last_trace: dict[str, Any] | None = None
