@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import typing
 from collections.abc import Callable
 from typing import Any, get_type_hints
 
@@ -40,7 +41,6 @@ from typing import Any, get_type_hints
 @functools.lru_cache(maxsize=64)
 def _python_type_to_json(python_type: Any) -> str:
     """Convert a Python type annotation to a JSON Schema type string."""
-    import typing
     origin = typing.get_origin(python_type)
     if origin is not None:
         python_type = origin

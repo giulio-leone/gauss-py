@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -152,8 +153,6 @@ class AgentStream:
             provider.  After the iterator is exhausted, :attr:`text`
             contains the full concatenated response.
         """
-        import inspect
-
         from gauss._native import stream_generate
 
         messages_json = json.dumps(self._messages)

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import datetime as dt
+import inspect
 from typing import Any
 
 
@@ -24,8 +27,6 @@ def _run_native(func: Any, *args: Any) -> Any:
     2. Event loop already running (e.g. Jupyter) → offload to a thread.
     3. Mock / sync return → pass through immediately.
     """
-    import asyncio
-    import inspect
 
     async def _call() -> Any:
         res = func(*args)
@@ -39,7 +40,6 @@ def _run_native(func: Any, *args: Any) -> Any:
         loop = None
 
     if loop is not None and loop.is_running():
-        import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as pool:
             return pool.submit(asyncio.run, _call()).result()
 

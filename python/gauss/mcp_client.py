@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import threading
 from dataclasses import dataclass, field
@@ -105,8 +106,6 @@ class McpClient:
             return
         if self._closed:
             raise RuntimeError("McpClient has been closed")
-
-        import os
 
         env = {**os.environ, **(self._config.env or {})}
         self._process = subprocess.Popen(

@@ -19,6 +19,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+_CODE_BLOCK_RE = re.compile(r"```(?:json)?\s*\n?([\s\S]*?)\n?\s*```")
+
 
 @dataclass
 class StructuredConfig:
@@ -60,7 +62,7 @@ def _build_structured_prompt(user_prompt: str, schema: dict[str, Any]) -> str:
 def _extract_json(text: str) -> str:
     """Extract JSON from text, handling code blocks and embedded JSON."""
     # Try markdown code blocks first
-    code_match = re.search(r"```(?:json)?\s*\n?([\s\S]*?)\n?\s*```", text)
+    code_match = _CODE_BLOCK_RE.search(text)
     if code_match:
         return code_match.group(1).strip()
 

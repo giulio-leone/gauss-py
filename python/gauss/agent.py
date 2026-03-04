@@ -17,8 +17,11 @@ One-liner::
 
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from collections.abc import Callable
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from gauss._types import (
@@ -115,7 +118,6 @@ class Agent(StatefulResource):
         self._mcp_tools_loaded = False
 
         # Cost & tracing (M90)
-        import threading
         self._state_lock = threading.Lock()
         self._last_cost: dict[str, Any] | None = None
         self._last_trace: dict[str, Any] | None = None
@@ -712,9 +714,7 @@ class Agent(StatefulResource):
 
         .. versionadded:: 2.1.0
         """
-        from gauss.tool import TypedToolDef as _TypedToolDef
-
-        td = _TypedToolDef(
+        td = TypedToolDef(
             name=name,
             description=description,
             parameters=parameters or {},
@@ -760,8 +760,6 @@ class Agent(StatefulResource):
 
         .. versionadded:: 2.1.0
         """
-        from dataclasses import replace
-
         self._check_alive()
         provider, _, api_key = self._config.resolve()
         config = replace(
@@ -791,8 +789,6 @@ class Agent(StatefulResource):
         Returns:
             A new :class:`Agent` instance configured with ``routing_policy``.
         """
-        from dataclasses import replace
-
         self._check_alive()
         config = replace(
             self._config,
@@ -831,8 +827,6 @@ class Agent(StatefulResource):
         Returns:
             A new :class:`Agent` instance resolved through routing policy + runtime context.
         """
-        from dataclasses import replace
-
         self._check_alive()
         requested_provider, requested_model, _ = self._config.resolve()
         provider, model = resolve_routing_target(
@@ -947,8 +941,6 @@ class Agent(StatefulResource):
 
         .. versionadded:: 2.0.0
         """
-        import asyncio
-
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.run, prompt)
 
@@ -968,8 +960,6 @@ class Agent(StatefulResource):
 
         .. versionadded:: 2.0.0
         """
-        import asyncio
-
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.generate, prompt)
 
@@ -989,8 +979,6 @@ class Agent(StatefulResource):
 
         .. versionadded:: 2.0.0
         """
-        import asyncio
-
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.run_with_tools, prompt, tool_executor)
 

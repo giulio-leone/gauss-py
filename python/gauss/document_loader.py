@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from gauss.text_splitter import TextSplitter
 from gauss.vector_store import Chunk
+
+_FRONTMATTER_RE = re.compile(r"^---[\s\S]*?---\n?")
 
 
 @dataclass
@@ -63,8 +66,7 @@ def load_markdown(
 ) -> LoadedDocument:
     """Load a Markdown file — strips frontmatter, splits on headings."""
     content, doc_id = _resolve_source(path_or_content, document_id, "markdown-document")
-    import re
-    content = re.sub(r"^---[\s\S]*?---\n?", "", content)
+    content = _FRONTMATTER_RE.sub("", content)
 
     splitter = TextSplitter(
         chunk_size=chunk_size,
