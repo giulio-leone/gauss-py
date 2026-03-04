@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from gauss.routing_policy import RoutingPolicy
+
+# slots=True requires Python 3.10+; fall back to plain dataclass on 3.9.
+_SLOTS_KW: dict[str, bool] = {"slots": True} if sys.version_info >= (3, 10) else {}
+
+
+def _slotted_dataclass(cls: type | None = None, **kwargs: Any) -> Any:
+    """Apply @dataclass with slots=True when the runtime supports it."""
+    merged = {**_SLOTS_KW, **kwargs}
+    if cls is None:
+        return lambda c: dataclass(c, **merged)
+    return dataclass(cls, **merged)
 
 
 class ProviderType(str, Enum):
@@ -28,7 +40,7 @@ class ProviderType(str, Enum):
     XAI = "xai"
 
 
-@dataclass
+@_slotted_dataclass
 class Message:
     """A chat message."""
 
@@ -39,7 +51,7 @@ class Message:
         return {"role": self.role, "content": self.content}
 
 
-@dataclass
+@_slotted_dataclass
 class ToolDef:
     """Tool definition for function calling."""
 
@@ -55,7 +67,7 @@ class ToolDef:
         }
 
 
-@dataclass
+@_slotted_dataclass
 class Citation:
     """A citation reference from document-aware responses."""
 
@@ -71,7 +83,7 @@ class Citation:
     """End index (character, page, or block depending on type)."""
 
 
-@dataclass
+@_slotted_dataclass
 class AgentResult:
     """Result from an agent run."""
 
@@ -87,7 +99,7 @@ class AgentResult:
         return self.text
 
 
-@dataclass
+@_slotted_dataclass
 class SearchResult:
     """Vector search result."""
 
@@ -97,7 +109,7 @@ class SearchResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
+@_slotted_dataclass
 class ProviderCapabilities:
     """Feature capabilities of a provider/model combination."""
 
@@ -116,7 +128,7 @@ class ProviderCapabilities:
     web_search: bool = False
 
 
-@dataclass
+@_slotted_dataclass
 class CostEstimate:
     """Estimated request cost from token usage."""
 
@@ -136,7 +148,7 @@ class CostEstimate:
     total_cost_usd: float
 
 
-@dataclass
+@_slotted_dataclass
 class CodeExecutionOptions:
     """Configuration for programmatic tool calling (code execution).
 
@@ -157,7 +169,7 @@ class CodeExecutionOptions:
     sandbox: Literal["default", "strict", "permissive"] = "default"
 
 
-@dataclass
+@_slotted_dataclass
 class CodeExecutionResult:
     """Result from code execution."""
 
@@ -169,7 +181,7 @@ class CodeExecutionResult:
     success: bool
 
 
-@dataclass
+@_slotted_dataclass
 class GroundingChunk:
     """A single grounding chunk (web search result)."""
 
@@ -177,7 +189,7 @@ class GroundingChunk:
     title: str | None = None
 
 
-@dataclass
+@_slotted_dataclass
 class GroundingMetadata:
     """Metadata from Google Search grounding."""
 
@@ -186,7 +198,7 @@ class GroundingMetadata:
     search_entry_point: str | None = None
 
 
-@dataclass
+@_slotted_dataclass
 class ImageGenerationConfig:
     """Configuration for image generation.
 
@@ -208,7 +220,7 @@ class ImageGenerationConfig:
     response_format: str | None = None
 
 
-@dataclass
+@_slotted_dataclass
 class GeneratedImageData:
     """A single generated image."""
 
@@ -217,7 +229,7 @@ class GeneratedImageData:
     mime_type: str | None = None
 
 
-@dataclass
+@_slotted_dataclass
 class ImageGenerationResult:
     """Result of image generation."""
 

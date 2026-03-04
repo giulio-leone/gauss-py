@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import json
 import logging
 import os
@@ -16,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 from gauss._types import ProviderType
+from gauss._utils import _utc_iso
 from gauss.errors import ValidationError
 from gauss.tokens import estimate_cost
 
@@ -471,7 +471,7 @@ class ControlPlane:
     def _capture_snapshot(self) -> dict[str, Any]:
         self._assert_context_allowed(self._context)
         item = {
-            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "generated_at": _utc_iso(),
             "context": dict(self._context),
             "spans": self._telemetry.export_spans() if self._telemetry else [],
             "metrics": self._telemetry.export_metrics() if self._telemetry else {},
@@ -893,7 +893,7 @@ class ControlPlane:
         version = {
             "version_id": f"policy-v{self._next_policy_lifecycle_version}",
             "status": "draft",
-            "created_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "created_at": _utc_iso(),
             "policy": self._parse_policy_lifecycle_policy(params),
             "validation": None,
             "audit": {
@@ -933,7 +933,7 @@ class ControlPlane:
         )
         if int(validation.get("failed", 0)) == 0:
             version["status"] = "validated"
-            version["validated_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+            version["validated_at"] = _utc_iso()
         return {
             "ok": int(validation.get("failed", 0)) == 0,
             "version": self._summarize_policy_lifecycle_version(version),
@@ -958,7 +958,7 @@ class ControlPlane:
                 "error": "version must pass validation before approval",
             }
         version["status"] = "approved"
-        version["approved_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        version["approved_at"] = _utc_iso()
         self._merge_lifecycle_audit(
             version,
             approved_by_role=role,
@@ -988,7 +988,7 @@ class ControlPlane:
             if item["version_id"] != version_id and item.get("status") == "promoted":
                 item["status"] = "approved"
         version["status"] = "promoted"
-        version["promoted_at"] = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        version["promoted_at"] = _utc_iso()
         self._merge_lifecycle_audit(
             version,
             promoted_by_role=role,
@@ -1125,7 +1125,7 @@ class ControlPlane:
         interval_ms = interval_ms if interval_ms is not None else 60_000
         if interval_ms <= 0:
             raise ValidationError("intervalMs must be > 0", "intervalMs")
-        now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        now = _utc_iso()
         self._policy_drift_schedule_config = {
             "enabled": True,
             "interval_ms": interval_ms,
@@ -1197,7 +1197,7 @@ class ControlPlane:
         self._next_policy_drift_run_id += 1
         self._policy_drift_runs.append(run)
         if self._policy_drift_schedule_config is not None:
-            now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+            now = _utc_iso()
             self._policy_drift_schedule_config["last_run_at"] = run["generated_at"]
             self._policy_drift_schedule_config["updated_at"] = now
         return run
@@ -1238,7 +1238,7 @@ class ControlPlane:
         response = {
             "ok": bool(guardrails.get("ok")),
             "alert": not bool(guardrails.get("ok")),
-            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "generated_at": _utc_iso(),
             "window": window,
             "baseline_version_id": baseline_version_id or self._active_policy_version_id,
             "candidate_version_id": candidate_version_id,
@@ -1255,7 +1255,7 @@ class ControlPlane:
     def _record_policy_explain_trace(self, mode: str, payload: dict[str, Any]) -> dict[str, Any]:
         trace = {
             "trace_id": f"trace-{self._next_explain_trace_id}",
-            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "generated_at": _utc_iso(),
             "mode": mode,
             "payload": payload,
         }
@@ -1519,7 +1519,7 @@ class ControlPlane:
     def _ops_health(self) -> dict[str, Any]:
         return {
             "status": "ok",
-            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "generated_at": _utc_iso(),
             "history_size": len(self._history),
             "stream_buffer_size": len(self._stream_events),
         }
@@ -1568,7 +1568,7 @@ class ControlPlane:
 
         return {
             "status": "ok",
-            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "generated_at": _utc_iso(),
             "history_size": len(history),
             "stream_buffer_size": stream_buffer_size,
             "spans_count": len(spans) if isinstance(spans, list) else 0,

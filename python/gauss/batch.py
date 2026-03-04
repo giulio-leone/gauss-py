@@ -100,8 +100,9 @@ def batch(
 
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
-            futures = [pool.submit(_run, i, item) for i, item in enumerate(items)]
-            concurrent.futures.wait(futures)
+            futures = {pool.submit(_run, i, item): i for i, item in enumerate(items)}
+            for fut in concurrent.futures.as_completed(futures):
+                fut.result()
     finally:
         agent.destroy()
 

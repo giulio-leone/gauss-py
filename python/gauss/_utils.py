@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
+
+
+def _utc_iso(dt_obj: dt.datetime | None = None) -> str:
+    """Return a UTC ISO-8601 timestamp with trailing 'Z'."""
+    if dt_obj is None:
+        dt_obj = dt.datetime.now(dt.UTC)
+    return dt_obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _run_native(func: Any, *args: Any) -> Any:
