@@ -219,7 +219,7 @@ def _resolve_routing_decision(
     current_hour_utc: int | None = None,
     governance_tags: list[str] | None = None,
 ) -> tuple[ProviderType, str, str]:
-    enforce_routing_time_window(policy, current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.UTC).hour)
+    enforce_routing_time_window(policy, current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.timezone.utc).hour)
     if estimated_cost_usd is not None:
         enforce_routing_cost_limit(policy, estimated_cost_usd)
     if current_requests_per_minute is not None:
@@ -345,7 +345,7 @@ def explain_routing_target(
     governance_tags: list[str] | None = None,
 ) -> dict[str, Any]:
     checks: list[dict[str, str]] = []
-    hour = current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.UTC).hour
+    hour = current_hour_utc if current_hour_utc is not None else dt.datetime.now(dt.timezone.utc).hour
 
     def fail(check: str, error: Exception) -> dict[str, Any]:
         message = str(error)

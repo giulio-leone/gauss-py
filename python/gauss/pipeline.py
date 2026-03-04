@@ -121,7 +121,7 @@ async def filter_async(
         )
     """
     flags = await map_async(items, predicate, concurrency=concurrency)
-    return [item for item, flag in zip(items, flags, strict=True) if flag]
+    return [item for item, flag in zip(items, flags) if flag]
 
 
 def filter_sync(
@@ -132,7 +132,7 @@ def filter_sync(
 ) -> list[T]:
     """Filter items using a sync predicate with optional thread concurrency."""
     flags = map_sync(items, predicate, concurrency=concurrency)
-    return [item for item, flag in zip(items, flags, strict=True) if flag]
+    return [item for item, flag in zip(items, flags) if flag]
 
 
 async def reduce_async(

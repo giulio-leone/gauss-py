@@ -12,7 +12,7 @@ from typing import Any
 def _utc_iso(dt_obj: dt.datetime | None = None) -> str:
     """Return a UTC ISO-8601 timestamp with trailing 'Z'."""
     if dt_obj is None:
-        dt_obj = dt.datetime.now(dt.UTC)
+        dt_obj = dt.datetime.now(dt.timezone.utc)
     return dt_obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
