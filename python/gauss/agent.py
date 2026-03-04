@@ -36,11 +36,11 @@ from gauss._types import (
 from gauss.base import StatefulResource
 from gauss.errors import DisposedError
 from gauss.routing_policy import RoutingPolicy, resolve_routing_target
-from gauss.stream import AgentStream
+from gauss.stream import AgentStream, StreamEvent
 from gauss.tool import TypedToolDef, create_tool_executor
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import AsyncIterator, Sequence
 
     from gauss.guardrail import GuardrailChain
     from gauss.mcp_client import McpClient
@@ -145,6 +145,63 @@ class Agent(StatefulResource):
         .. versionadded:: 2.1.0
         """
         return cls(**kwargs)
+
+    @classmethod
+    def quick(
+        cls,
+        model: str,
+        instructions: str,
+        *,
+        tools: list[Any] | None = None,
+        max_steps: int = 10,
+    ) -> Agent:
+        """Create an agent with minimal configuration.
+
+        A convenience factory that sets the model and system prompt in a
+        single call.  Additional tools and a step limit can be provided.
+
+        Args:
+            model: Model identifier (e.g. ``"gpt-4o"``).
+            instructions: System prompt / instructions for the agent.
+            tools: Optional list of tool definitions.
+            max_steps: Maximum agentic loop iterations (default ``10``).
+
+        Returns:
+            A new :class:`Agent` instance.
+
+        Example:
+            >>> agent = Agent.quick('gpt-4o', 'You are helpful')
+
+        .. versionadded:: 2.5.0
+        """
+        config_kwargs: dict[str, Any] = {
+            "model": model,
+            "system_prompt": instructions,
+            "max_retries": max_steps,
+        }
+        if tools:
+            config_kwargs["tools"] = tools
+        return cls(**config_kwargs)
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> Agent:
+        """Create an agent from a plain configuration dict.
+
+        Keys are forwarded to :class:`AgentConfig`.
+
+        Args:
+            config: A mapping of configuration keys accepted by
+                :class:`AgentConfig`.
+
+        Returns:
+            A new :class:`Agent` instance.
+
+        Example:
+            >>> agent = Agent.from_config({"model": "gpt-4o", "system_prompt": "Hi"})
+
+        .. versionadded:: 2.5.0
+        """
+        return cls(**config)
 
     # ── Execution ──────────────────────────────────────────────────────
 
@@ -886,6 +943,34 @@ class Agent(StatefulResource):
 
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.run_with_tools, prompt, tool_executor)
+
+    async def astream(
+        self,
+        prompt: str | Sequence[Message | dict[str, str]],
+    ) -> AsyncIterator[StreamEvent]:
+        """Async iterator for streaming agent execution.
+
+        Yields :class:`StreamEvent` objects as the model generates its
+        response.  This is the recommended streaming API for ``asyncio``
+        code.
+
+        Args:
+            prompt: A plain string or sequence of messages.
+
+        Yields:
+            :class:`StreamEvent` instances (``text_delta``,
+            ``tool_call_delta``, etc.).
+
+        Example:
+            >>> async for event in agent.astream("Hello"):
+            ...     if event.type == "text_delta":
+            ...         print(event.text, end="")
+
+        .. versionadded:: 2.5.0
+        """
+        stream_obj = self.stream_iter(prompt)
+        async for event in stream_obj:
+            yield event
 
     def use_mcp_server(self, client: McpClient) -> Agent:
         """Consume tools from an external MCP server.
