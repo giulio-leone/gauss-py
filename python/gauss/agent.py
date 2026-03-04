@@ -114,6 +114,8 @@ class Agent(StatefulResource):
         self._mcp_tools_loaded = False
 
         # Cost & tracing (M90)
+        import threading
+        self._state_lock = threading.Lock()
         self._last_cost: dict[str, Any] | None = None
         self._last_trace: dict[str, Any] | None = None
 
@@ -292,15 +294,16 @@ class Agent(StatefulResource):
         # Populate cost & trace from usage (M90)
         usage = result.usage or {}
         if usage:
-            self._last_cost = {
-                "input_tokens": usage.get("input_tokens", 0),
-                "output_tokens": usage.get("output_tokens", 0),
-                "total_usd": usage.get("total_usd"),
-            }
-            self._last_trace = {
-                "model": self._model,
-                "usage": usage,
-            }
+            with self._state_lock:
+                self._last_cost = {
+                    "input_tokens": usage.get("input_tokens", 0),
+                    "output_tokens": usage.get("output_tokens", 0),
+                    "total_usd": usage.get("total_usd"),
+                }
+                self._last_trace = {
+                    "model": self._model,
+                    "usage": usage,
+                }
 
         # Memory store: save conversation
         if self._memory is not None:
