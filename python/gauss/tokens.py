@@ -9,6 +9,18 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from gauss._types import CostEstimate
 
+__all__ = [
+    "ModelPricing",
+    "set_pricing",
+    "get_pricing",
+    "clear_pricing",
+    "count_tokens",
+    "count_tokens_for_model",
+    "count_message_tokens",
+    "get_context_window_size",
+    "estimate_cost",
+]
+
 # ─── Runtime Pricing Override ────────────────────────────────────────
 
 @dataclass

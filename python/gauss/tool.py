@@ -32,6 +32,7 @@ from typing import Any
 
 from gauss._types import ToolDef
 
+__all__ = ["TypedToolDef", "tool", "create_tool_executor"]
 
 @dataclass
 class TypedToolDef(ToolDef):

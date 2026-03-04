@@ -26,6 +26,7 @@ from gauss._types import (
 )
 from gauss._utils import _run_native
 
+__all__ = ["execute_code", "available_runtimes", "version", "generate_image"]
 
 def execute_code(
     language: str,

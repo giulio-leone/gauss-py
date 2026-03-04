@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import re
 
+__all__ = ["PromptTemplate", "template"]
+
 _VAR_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 
 

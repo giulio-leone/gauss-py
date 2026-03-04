@@ -36,6 +36,24 @@ from ._native import (
     a2a_send_message as _a2a_send_message,
 )
 
+__all__ = [
+    "TaskState",
+    "Part",
+    "A2aMessage",
+    "TaskStatus",
+    "Artifact",
+    "AgentSkill",
+    "AgentCapabilities",
+    "AgentCard",
+    "Task",
+    "A2aClient",
+    "text_message",
+    "user_message",
+    "agent_message",
+    "extract_text",
+    "task_text",
+]
+
 # ── Types ────────────────────────────────────────────────────────────────────
 
 

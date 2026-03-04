@@ -9,6 +9,7 @@ from typing import Any
 from gauss._types import ToolDef
 from gauss.base import StatefulResource
 
+__all__ = ["Workflow"]
 
 class Workflow(StatefulResource):
     """Execute agents as sequential/parallel workflow steps.

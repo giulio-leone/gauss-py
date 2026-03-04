@@ -10,6 +10,22 @@ from typing import Any
 from gauss._types import ToolDef
 from gauss.base import StatefulResource
 
+__all__ = [
+    "McpResource",
+    "McpPromptArgument",
+    "McpPrompt",
+    "McpResourceContent",
+    "McpContent",
+    "McpPromptMessage",
+    "McpPromptResult",
+    "McpModelHint",
+    "McpModelPreferences",
+    "McpSamplingMessage",
+    "McpSamplingRequest",
+    "McpSamplingResponse",
+    "McpServer",
+]
+
 # ── MCP Types ────────────────────────────────────────────────────
 
 

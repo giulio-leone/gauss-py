@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+__all__ = ["parse_agent_config", "resolve_env"]
 
 def parse_agent_config(json_str: str) -> str:
     """Parse and validate agent configuration from JSON string.

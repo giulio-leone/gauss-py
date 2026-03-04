@@ -8,6 +8,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from gauss.agent import Agent
 
+__all__ = [
+    "create_fallback_provider",
+    "create_circuit_breaker",
+    "create_resilient_provider",
+    "create_resilient_agent",
+]
 
 def create_fallback_provider(provider_handles: list[int]) -> int:
     """Create a fallback provider that tries providers in order.

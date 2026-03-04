@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["PluginRegistry"]
 
 class PluginRegistry(StatefulResource):
     """Plugin system with event emission and built-in plugins.

@@ -54,6 +54,7 @@ if TYPE_CHECKING:
 
 from gauss._utils import _run_native  # noqa: F401 — re-exported for backward compat
 
+__all__ = ["Agent", "gauss", "enterprise_preset", "enterprise_run"]
 
 class Agent(StatefulResource):
     """Production-grade AI agent powered by Rust.

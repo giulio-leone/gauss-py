@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["EvalRunner"]
 
 class EvalRunner(StatefulResource):
     """Run evaluations with configurable scorers and datasets.

@@ -7,6 +7,7 @@ from typing import Any
 
 from gauss.errors import DisposedError
 
+__all__ = ["StatefulResource"]
 
 class StatefulResource(ABC):
     """Abstract base class for resources with lifecycle management.

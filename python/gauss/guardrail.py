@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["GuardrailChain"]
 
 class GuardrailChain(StatefulResource):
     """Chainable content safety guardrails.

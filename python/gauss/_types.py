@@ -321,6 +321,27 @@ from gauss.models import (
     PROVIDER_DEFAULTS,
 )
 
+__all__ = [
+    "ProviderType",
+    "Message",
+    "ToolDef",
+    "Citation",
+    "AgentResult",
+    "SearchResult",
+    "ProviderCapabilities",
+    "CostEstimate",
+    "CodeExecutionOptions",
+    "CodeExecutionResult",
+    "GroundingChunk",
+    "GroundingMetadata",
+    "ImageGenerationConfig",
+    "GeneratedImageData",
+    "ImageGenerationResult",
+    "AgentConfig",
+    "detect_provider",
+    "resolve_api_key",
+]
+
 _DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.OPENAI: OPENAI_DEFAULT,
     ProviderType.ANTHROPIC: ANTHROPIC_DEFAULT,

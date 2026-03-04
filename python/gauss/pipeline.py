@@ -19,6 +19,8 @@ import concurrent.futures
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, TypeVar
 
+__all__ = ["map_sync", "filter_sync", "reduce_sync", "compose"]
+
 T = TypeVar("T")
 R = TypeVar("R")
 

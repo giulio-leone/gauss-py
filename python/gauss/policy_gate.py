@@ -14,6 +14,7 @@ from gauss.routing_policy import (
     evaluate_policy_rollout_guardrails,
 )
 
+__all__ = ["main"]
 
 def _load_json(path: str) -> Any:
     return json.loads(Path(path).read_text(encoding="utf-8"))

@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 from gauss.base import StatefulResource
 
+__all__ = ["Memory"]
+
 MemoryEntryType = Literal["conversation", "fact", "preference", "task", "summary"]
 
 

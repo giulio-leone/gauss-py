@@ -6,6 +6,7 @@ import functools
 
 from gauss.base import StatefulResource
 
+__all__ = ["MiddlewareChain"]
 
 class MiddlewareChain(StatefulResource):
     """Chainable middleware pipeline for LLM requests.

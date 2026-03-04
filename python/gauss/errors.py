@@ -14,6 +14,13 @@ All Gauss errors inherit from :class:`GaussError` to enable typed exception hand
 
 from __future__ import annotations
 
+__all__ = [
+    "GaussError",
+    "DisposedError",
+    "ProviderError",
+    "ToolExecutionError",
+    "ValidationError",
+]
 
 class GaussError(Exception):
     """Base error for all Gauss SDK errors.

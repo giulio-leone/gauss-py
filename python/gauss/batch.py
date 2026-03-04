@@ -20,6 +20,7 @@ from gauss._types import AgentConfig, AgentResult
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+__all__ = ["BatchItem", "batch"]
 
 class BatchItem:
     """Container for the result of a single prompt within a batch run.

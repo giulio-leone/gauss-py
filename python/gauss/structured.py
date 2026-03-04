@@ -19,6 +19,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+__all__ = ["StructuredConfig", "StructuredResult", "structured"]
+
 _CODE_BLOCK_RE = re.compile(r"```(?:json)?\s*\n?([\s\S]*?)\n?\s*```")
 
 

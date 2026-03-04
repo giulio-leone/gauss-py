@@ -11,6 +11,8 @@ from typing import Any
 from gauss.text_splitter import TextSplitter
 from gauss.vector_store import Chunk
 
+__all__ = ["LoadedDocument", "load_text", "load_markdown", "load_json"]
+
 _FRONTMATTER_RE = re.compile(r"^---[\s\S]*?---\n?")
 
 

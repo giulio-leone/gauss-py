@@ -24,6 +24,8 @@ from typing import Any, Literal
 
 from gauss.base import StatefulResource
 
+__all__ = ["Team"]
+
 TeamStrategy = Literal["sequential", "parallel"]
 
 

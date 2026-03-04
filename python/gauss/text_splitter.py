@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+__all__ = ["TextChunk", "TextSplitterOptions", "TextSplitter", "split_text"]
 
 @dataclass
 class TextChunk:
@@ -23,7 +24,7 @@ class TextSplitterOptions:
     separators: list[str] | None = None
 
 
-_DEFAULT_SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
+_DEFAULT_SEPARATORS = ("\n\n", "\n", ". ", " ", "")
 
 
 class TextSplitter:

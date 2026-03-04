@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["ApprovalManager"]
 
 class ApprovalManager(StatefulResource):
     """Manage human approval workflows for sensitive agent actions.

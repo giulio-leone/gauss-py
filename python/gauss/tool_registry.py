@@ -9,6 +9,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["ToolExample", "ToolRegistryEntry", "ToolSearchResult", "ToolRegistry"]
 
 @dataclass(frozen=True)
 class ToolExample:

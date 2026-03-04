@@ -8,6 +8,25 @@ from typing import Any
 
 from gauss._types import ProviderType
 
+__all__ = [
+    "RoutingCandidate",
+    "GovernanceRule",
+    "GovernancePolicyPack",
+    "RoutingPolicy",
+    "RoutingPolicyError",
+    "governance_policy_pack",
+    "apply_governance_pack",
+    "resolve_routing_target",
+    "resolve_fallback_provider",
+    "enforce_routing_cost_limit",
+    "enforce_routing_rate_limit",
+    "enforce_routing_time_window",
+    "enforce_routing_governance",
+    "explain_routing_target",
+    "evaluate_policy_gate",
+    "evaluate_policy_diff",
+    "evaluate_policy_rollout_guardrails",
+]
 
 @dataclass
 class RoutingCandidate:

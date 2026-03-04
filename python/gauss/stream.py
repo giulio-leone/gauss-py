@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
+__all__ = ["parse_partial_json", "StreamEvent", "AgentStream"]
 
 def parse_partial_json(text: str) -> Any:
     """Parse incomplete/streaming JSON into a valid Python object.

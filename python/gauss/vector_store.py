@@ -11,6 +11,7 @@ from typing import Any
 from gauss._types import SearchResult
 from gauss.base import StatefulResource
 
+__all__ = ["Chunk", "VectorStore"]
 
 @dataclass
 class Chunk:

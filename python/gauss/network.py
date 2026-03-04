@@ -10,6 +10,7 @@ from gauss._types import Message
 from gauss.base import StatefulResource
 from gauss.errors import DisposedError, ValidationError
 
+__all__ = ["Network"]
 
 class Network(StatefulResource):
     """Multi-agent network with supervisor-based delegation.

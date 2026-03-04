@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from gauss.routing_policy import RoutingPolicy
     from gauss.telemetry import Telemetry
 
+__all__ = ["ControlPlane"]
 
 _SECTION_KEYS = {"spans", "metrics", "pending_approvals", "latest_cost"}
 _STREAM_CHANNELS = {"snapshot", "timeline", "dag"}
@@ -1621,7 +1622,7 @@ class ControlPlane:
                 current["run_ids"].add(str(context["run_id"]))
 
         out: list[dict[str, Any]] = []
-        for tenant_id in sorted(grouped.keys()):
+        for tenant_id in sorted(grouped):
             current = grouped[tenant_id]
             out.append(
                 {

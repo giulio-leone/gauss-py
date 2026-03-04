@@ -28,6 +28,7 @@ from typing import Any
 
 from gauss._types import ToolDef
 
+__all__ = ["McpClientConfig", "McpToolResult", "McpClient"]
 
 @dataclass
 class McpClientConfig:

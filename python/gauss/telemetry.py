@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["Telemetry"]
 
 class Telemetry(StatefulResource):
     """Collect and export spans and metrics.

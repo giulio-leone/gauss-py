@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["CheckpointStore"]
 
 class CheckpointStore(StatefulResource):
     """Save and restore agent execution state.

@@ -8,6 +8,7 @@ from typing import Any
 
 from gauss.base import StatefulResource
 
+__all__ = ["ToolValidator"]
 
 class ToolValidator(StatefulResource):
     """Validate tool inputs against JSON schemas with auto-coercion.

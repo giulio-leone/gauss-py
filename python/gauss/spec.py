@@ -28,6 +28,14 @@ from gauss._native import discover_agents as _native_discover
 from gauss._native import parse_agents_md as _native_parse_agents
 from gauss._native import parse_skill_md as _native_parse_skill
 
+__all__ = [
+    "AgentToolSpec",
+    "SkillStep",
+    "SkillParam",
+    "AgentSpec",
+    "SkillSpec",
+    "discover_agents",
+]
 
 @dataclass(frozen=True)
 class AgentToolSpec:
