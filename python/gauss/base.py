@@ -40,7 +40,7 @@ class StatefulResource(ABC):
         try:
             if not self._destroyed:
                 self.destroy()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
 
     def __enter__(self) -> Any:
